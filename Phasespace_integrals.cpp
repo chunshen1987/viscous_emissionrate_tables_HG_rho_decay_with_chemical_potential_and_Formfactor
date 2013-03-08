@@ -305,7 +305,7 @@ double Integrate_E2(double* m, double* mu, double Eq, double T, int channel, dou
             double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
-            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, m, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, m, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
 
          for(int i=0; i<n_E2; i++)
@@ -321,7 +321,7 @@ double Integrate_E2(double* m, double* mu, double Eq, double T, int channel, dou
             double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
-            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, m, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, m, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
       }
       else
@@ -339,7 +339,7 @@ double Integrate_E2(double* m, double* mu, double Eq, double T, int channel, dou
             double f0_E3 = Bose_distribution(E1 - E2_pt[i] - Eq, T, mu3);
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
-            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, m, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, m, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
       }
 
@@ -357,7 +357,7 @@ double Integrate_E2(double* m, double* mu, double Eq, double T, int channel, dou
    return(0);
 }
 
-inline double viscous_integrand(double s, double t, double E1, double E2, double Eq, double* m, double f0_E1, double f0_E2, double f0_E3)
+inline double viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double* m, double f0_E1, double f0_E2, double f0_E3)
 {
    double eps = 1e-100;
    double m1 = m[0];
@@ -368,13 +368,10 @@ inline double viscous_integrand(double s, double t, double E1, double E2, double
    double p2 = sqrt(E2*E2 - m2*m2);
    double p3 = sqrt(E3*E3 - m3*m3);
    double costheta1 = (- s - t + m2*m2 + m3*m3 + 2*E1*Eq)/(2*p1*Eq);
-   double sintheta1 = sqrt(1 - costheta1*costheta1);
    double costheta2 = ( - t + m2*m2 + 2*E2*Eq)/(2*p2*Eq);
-   double sintheta2 = sqrt(1 - costheta2*costheta2);
    double p3_z = p1*costheta1 - p2*costheta2 - Eq; 
-   double cosphi = (s - m1*m1 - m2*m2 + 2*E1*E2 - 2*p1*p2*costheta1*costheta2)
-                   /(2*p1*p2*sintheta1*sintheta2 + eps);
-   double integrand = (1. + f0_E1)*deltaf_chi(p1)*0.5*(-1. + 3.*costheta1*costheta1) + f0_E2*deltaf_chi(p2)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
+
+   double integrand = (1. + f0_E1)*deltaf_chi(p1/T)*0.5*(-1. + 3.*costheta1*costheta1) + f0_E2*deltaf_chi(p2/T)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3/T)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
 
    return(integrand);
 }
