@@ -99,7 +99,7 @@ int Calculate_emissionrates(double* m, Chemical_potential* chempotential_ptr, in
              viscous_result_s += viscous_result_t*s_weight[k];
           }
           equilibrium_results[i][j] = equilibrium_result_s*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
-          viscous_results[i][j] = viscous_result_s*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
+          viscous_results[i][j] = viscous_result_s*prefactor/(Eq*Eq)/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
       }
    }
 
