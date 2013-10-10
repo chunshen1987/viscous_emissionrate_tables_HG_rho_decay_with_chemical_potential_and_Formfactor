@@ -26,11 +26,11 @@ endif
 
 SRC		=	main.cpp Arsenal.cpp gauss_quadrature.cpp \
                   Table2D.cpp chemical_potential.cpp Formfactor.cpp \
-                  HG_2to2_Scattering.cpp ParameterReader.cpp
+                  HG_1to3_decay.cpp ParameterReader.cpp
 
 INC		= 	Arsenal.h Physicalconstants.h Stopwatch.h \
                   gauss_quadrature.h Table2D.h chemical_potential.h \
-                  Formfactor.h HG_2to2_Scattering.h ParameterReader.h
+                  Formfactor.h HG_1to3_decay.h ParameterReader.h
 
 # -------------------------------------------------
 
@@ -76,10 +76,10 @@ install:	$(TARGET)
 		cp $(TARGET) $(INSTPATH)
 
 # --------------- Dependencies -------------------
-main.cpp : Arsenal.h Stopwatch.h gauss_quadrature.h Physicalconstants.h HG_2to2_Scattering.h ParameterReader.h
+main.cpp : Arsenal.h Stopwatch.h gauss_quadrature.h Physicalconstants.h HG_1to3_decay.h ParameterReader.h
 Arsenal.cpp : gauss_quadrature.h
 Table2D.cpp : Arsenal.h
 chemical_potential.cpp : Arsenal.h Table2D.h Physicalconstants.h
 Formfactor.cpp : Physicalconstants.h
 ParameterReader.cpp : Arsenal.h
-HG_2to2_Scattering.cpp : ParameterReader.h Arsenal.h Physicalconstants.h gauss_quadrature.h chemical_potential.h
+HG_1to3_decay.cpp : ParameterReader.h Arsenal.h Physicalconstants.h gauss_quadrature.h chemical_potential.h

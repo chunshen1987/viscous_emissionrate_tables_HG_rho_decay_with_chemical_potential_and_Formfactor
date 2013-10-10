@@ -10,7 +10,7 @@ class HG_1to3_decay;
 
 struct CCallbackHolder
 {
-   HG_2to2_Scattering* clsPtr;
+   HG_1to3_decay* clsPtr;
    void *params;
 };
 
@@ -42,8 +42,8 @@ class HG_1to3_decay
       double deltaf_alpha;
 
    public:
-      HG_2to2_Scattering(ParameterReader* paraRdr_in);
-      ~HG_2to2_Scattering();
+      HG_1to3_decay(ParameterReader* paraRdr_in);
+      ~HG_1to3_decay();
       
       void output_emissionrateTable();
       int Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel, string filename_in);

@@ -8,16 +8,15 @@
 #include <time.h>
 
 #include "Arsenal.h"
-#include "Matrix_elements_sq.h"
-#include "Phasespace_integrals.h"
-#include "parameters.h"
+#include "Physicalconstants.h"
 #include "Stopwatch.h"
 #include "chemical_potential.h"
+#include "HG_1to3_decay.h"
 
 using namespace std;
 
 
-int main()
+int main(int argc, char** argv)
 {
    Stopwatch sw; 
    sw.tic();
@@ -32,13 +31,16 @@ int main()
    double m[3];
    string filename;
    
+   ParameterReader* paraRdr = new ParameterReader();
+   paraRdr->readFromFile("parameters.dat");
+   paraRdr->readFromArguments(argc, argv);
+
+   HG_1to3_decay test(paraRdr);
+
    //C.3
    filename = "rho_to_pion_pion_gamma";
    channel = 8;
-   m[0] = mrho;
-   m[1] = mpion;
-   m[2] = mpion;
-   Calculate_emissionrates(m, chempotential_ptr, channel, filename);
+   test.Calculate_emissionrates(chempotential_ptr, channel, filename);
 
    sw.toc();
    cout << "totally takes : " << sw.takeTime() << "sec." << endl;

@@ -18,7 +18,7 @@
 
 using namespace std;
 
-HG_2to2_Scattering::HG_2to2_Scattering(ParameterReader* paraRdr_in)
+HG_1to3_decay::HG_1to3_decay(ParameterReader* paraRdr_in)
 {
    eps = 1e-16;
    paraRdr = paraRdr_in;
@@ -85,7 +85,7 @@ HG_2to2_Scattering::HG_2to2_Scattering(ParameterReader* paraRdr_in)
 
 }
 
-HG_2to2_Scattering::~HG_2to2_Scattering()
+HG_1to3_decay::~HG_1to3_decay()
 {
    delete[] Eq_tb;
    delete[] T_tb;
@@ -129,7 +129,7 @@ HG_2to2_Scattering::~HG_2to2_Scattering()
 
 }
 
-void HG_2to2_Scattering::output_emissionrateTable()
+void HG_1to3_decay::output_emissionrateTable()
 {
    ostringstream output_file_eqrate;
    ostringstream output_file_viscous;
@@ -151,7 +151,7 @@ void HG_2to2_Scattering::output_emissionrateTable()
    }
 }
 
-int HG_2to2_Scattering::Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel_in, string filename_in)
+int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel_in, string filename_in)
 {
    double* results = new double [2];
 
@@ -190,7 +190,7 @@ int HG_2to2_Scattering::Calculate_emissionrates(Chemical_potential* chempotentia
           Eq = Eq_tb[i];
           formfactor = Formfactor_tb[i];
           double prefactor = 1./16./pow(2.0*M_PI, 7)/Eq*formfactor;
-/*
+          
           double equilibrium_result_s = 0.0;
           double viscous_result_s = 0.0;
           for(int k=0; k<n_s; k++)
@@ -206,16 +206,17 @@ int HG_2to2_Scattering::Calculate_emissionrates(Chemical_potential* chempotentia
              equilibrium_result_s += equilibrium_result_t*s_weight[k];
              viscous_result_s += viscous_result_t*s_weight[k];
           }
-*/
+          
           //integrate using gsl routines
           cout << T << "   " << Eq << endl;
-          double s_min;
-          double m_init_sq = (m[0] + m[1])*(m[0] + m[1]);
-          double m_final_sq = m[2]*m[2];
-          if(m_init_sq > m_final_sq)
-             s_min = m_init_sq;
-          else
-             s_min = m_final_sq;
+          cout << equilibrium_result_s << "   " << viscous_result_s << endl;
+          if(m[0] < (m[1] + m[2]))
+          {
+             cout << "Error: decay particle mass is smaller than daughter particles! Please check!" << endl;
+             exit(0);
+          }
+          double s_min = m[2]*m[2];
+          double s_max = (m[0]-m[1])*(m[0]-m[1]);
           
           double rateType = 0;   // rateType = 0 for equilibrium rates, rateType = 1 for viscous correction
           double *paramsPtr = new double [3];
@@ -242,8 +243,7 @@ int HG_2to2_Scattering::Calculate_emissionrates(Chemical_potential* chempotentia
 
           gsl_integration_workspace_free(gsl_workSpace);
           delete Callback_params;
-//          cout << equilibrium_result_s << "   " << viscous_result_s << endl;
-//          cout << gslresult_eq << "   " << gslresult_vis << endl;
+          cout << gslresult_eq << "   " << gslresult_vis << endl;
           equilibrium_results[i][j] = gslresult_eq*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
           viscous_results[i][j] = gslresult_vis*prefactor/(Eq*Eq)/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
       }
@@ -258,16 +258,15 @@ int HG_2to2_Scattering::Calculate_emissionrates(Chemical_potential* chempotentia
 }
 
 
-void HG_2to2_Scattering::set_gausspoints()
+void HG_1to3_decay::set_gausspoints()
 {
-   double s_min;
-   double s_max = paraRdr->getVal("s_max");
-   double m_init_sq = (m[0] + m[1])*(m[0] + m[1]);
-   double m_final_sq = m[2]*m[2];
-   if(m_init_sq > m_final_sq)
-      s_min = m_init_sq;
-   else
-      s_min = m_final_sq;
+   if(m[0] < (m[1] + m[2]))
+   {
+      cout << "Error: decay particle mass is smaller than daughter particles! Please check!" << endl;
+      exit(0);
+   }
+   double s_min = m[2]*m[2];
+   double s_max = (m[0]-m[1])*(m[0]-m[1]);
   
    gauss_quadrature(n_s, 1, 0.0, 0.0, s_min, s_max, s_pt, s_weight);
   
@@ -298,7 +297,7 @@ void HG_2to2_Scattering::set_gausspoints()
     return;
 }
 
-void HG_2to2_Scattering::set_particleMass()
+void HG_1to3_decay::set_particleMass()
 {
    if(channel == 1)
    {
@@ -342,6 +341,12 @@ void HG_2to2_Scattering::set_particleMass()
       m[1] = mK;
       m[2] = mpion;
    }
+   else if (channel == 8)
+   {
+      m[0] = mrho;
+      m[1] = mpion;
+      m[2] = mpion;
+   }
    else
    {
       cout << "Error:: set_particleMass: input channel is invalide, channel = " << channel << endl;
@@ -351,7 +356,7 @@ void HG_2to2_Scattering::set_particleMass()
 }
 
 
-double HG_2to2_Scattering::Integrate_E1(double Eq, double T, double s, double t, double* results)
+double HG_1to3_decay::Integrate_E1(double Eq, double T, double s, double t, double* results)
 {
    double equilibrium_result = 0.0e0;
    double viscous_result = 0.0e0;
@@ -376,7 +381,7 @@ double HG_2to2_Scattering::Integrate_E1(double Eq, double T, double s, double t,
       equilibrium_result += results[0]*E1_weight[i];
       viscous_result += results[1]*E1_weight[i];
    }
-
+   
    results[0] = equilibrium_result;
    results[1] = viscous_result;
 
@@ -386,17 +391,17 @@ double HG_2to2_Scattering::Integrate_E1(double Eq, double T, double s, double t,
    return(0);
 }
 
-double HG_2to2_Scattering::Integrate_E2(double Eq, double T, double s, double t, double E1, double* results)
+double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, double E1, double* results)
 {
    double equilibrium_result = 0.0;
    double viscous_result = 0.0;
    double E2_min;
    double E2_max;
-   double min_1 = Eq*m[1]*m[1]/(m[1]*m[1] - t) + (m[1]*m[1] - t)/4/Eq;
+   double min_1 = Eq*m[1]*m[1]/(t - m[1]*m[1]) + (t - m[1]*m[1])/4/Eq;
 
    double a = - (s + t - m[1]*m[1] - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]);
-   double b = Eq*((s + t - m[1]*m[1] - m[2]*m[2])*(s - m[0]*m[0] - m[1]*m[1]) 
-              - 2*m[0]*m[0]*(m[1]*m[1] - t)) + E1*(m[1]*m[1] - t)
+   double b = - Eq*((s + t - m[1]*m[1] - m[2]*m[2])*(s - m[0]*m[0] - m[1]*m[1]) 
+              - 2*m[0]*m[0]*(m[1]*m[1] - t)) - E1*(m[1]*m[1] - t)
               *(s + t - m[1]*m[1] - m[2]*m[2]);
    double c = - (t - m[1]*m[1])*(t - m[1]*m[1])*E1*E1
               - 2*Eq*(2*m[1]*m[1]*(s + t - m[1]*m[1] - m[2]*m[2]) 
@@ -410,12 +415,12 @@ double HG_2to2_Scattering::Integrate_E2(double Eq, double T, double s, double t,
 
    if((b*b - a*c) >= 0) 
    {
-      double min_2 = (-b + sqrt(b*b - a*c))/(a + eps);
+      double min_2 = (-b + sqrt(b*b - a*c))/a;
       if(min_1 < min_2)
          E2_min = min_2;
       else
          E2_min = min_1;
-      E2_max = (-b - sqrt(b*b - a*c))/(a + eps);
+      E2_max = (-b - sqrt(b*b - a*c))/a;
 
       if(E2_max < E2_min)
       {
@@ -446,7 +451,7 @@ double HG_2to2_Scattering::Integrate_E2(double Eq, double T, double s, double t,
             double f0_E1 = Bose_distribution(E1, T, mu1);
             double f0_E2 = Bose_distribution(E2_pt[i], T, mu2);
             double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
-            common_factor = f0_E1*f0_E2*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c) + eps);
+            common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
@@ -462,7 +467,7 @@ double HG_2to2_Scattering::Integrate_E2(double Eq, double T, double s, double t,
             double f0_E1 = Bose_distribution(E1, T, mu1);
             double f0_E2 = Bose_distribution(E2_pt[i], T, mu2);
             double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
-            common_factor = f0_E1*f0_E2*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c) + eps);
+            common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
@@ -479,8 +484,8 @@ double HG_2to2_Scattering::Integrate_E2(double Eq, double T, double s, double t,
          {
             double f0_E1 = Bose_distribution(E1, T, mu1);
             double f0_E2 = Bose_distribution(E2_pt[i], T, mu2);
-            double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
-            common_factor = f0_E1*f0_E2*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c) + eps);
+            double f0_E3 = Bose_distribution(E1 - E2_pt[i] - Eq, T, mu3);
+            common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
@@ -500,35 +505,35 @@ double HG_2to2_Scattering::Integrate_E2(double Eq, double T, double s, double t,
    return(0);
 }
 
-double HG_2to2_Scattering::viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3)
+double HG_1to3_decay::viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3)
 {
    double m1 = m[0];
    double m2 = m[1];
    double m3 = m[2];
-   double E3 = E1 + E2 - Eq;
+   double E3 = E1 - E2 - Eq;
    double p1 = sqrt(E1*E1 - m1*m1);
    double p2 = sqrt(E2*E2 - m2*m2);
    double p3 = sqrt(E3*E3 - m3*m3);
-   double costheta1 = (- s - t + m2*m2 + m3*m3 + 2*E1*Eq)/(2*p1*Eq + eps);
-   double costheta2 = (t - m2*m2 + 2*E2*Eq)/(2*p2*Eq + eps);
-   double p3_z = p1*costheta1 + p2*costheta2 - Eq; 
-   
-   double integrand = (1. + f0_E1)*deltaf_chi(p1/T)*0.5*(-1. + 3.*costheta1*costheta1) + (1. + f0_E2)*deltaf_chi(p2/T)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3/T)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
+   double costheta1 = (- s - t + m2*m2 + m3*m3 + 2*E1*Eq)/(2*p1*Eq);
+   double costheta2 = ( - t + m2*m2 + 2*E2*Eq)/(2*p2*Eq);
+   double p3_z = p1*costheta1 - p2*costheta2 - Eq; 
+
+   double integrand = (1. + f0_E1)*deltaf_chi(p1/T)*0.5*(-1. + 3.*costheta1*costheta1) + f0_E2*deltaf_chi(p2/T)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3/T)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
 
    return(integrand);
 }
 
-double HG_2to2_Scattering::Bose_distribution(double E, double T, double mu)
+double HG_1to3_decay::Bose_distribution(double E, double T, double mu)
 {
    return(1.0/(exp((E-mu)/T)-1.0));
 }
 
-double HG_2to2_Scattering::deltaf_chi(double p)
+double HG_1to3_decay::deltaf_chi(double p)
 { 
     return(pow(p, deltaf_alpha));
 }
 
-double HG_2to2_Scattering::Rateintegrands(double s, void *params)
+double HG_1to3_decay::Rateintegrands(double s, void *params)
 {
     double *par = (double*)params;
     double rateType = par[0];
@@ -570,7 +575,7 @@ double HG_2to2_Scattering::Rateintegrands(double s, void *params)
     return(gslresult);
 }
 
-double HG_2to2_Scattering::Rateintegrandt(double t, void *params)
+double HG_1to3_decay::Rateintegrandt(double t, void *params)
 {
     double *par = (double*)params;
     double rateType = par[0];
@@ -610,7 +615,7 @@ double HG_2to2_Scattering::Rateintegrandt(double t, void *params)
     return(gslresult*matrixElementsSq);
 }
 
-double HG_2to2_Scattering::RateintegrandE1(double E1, void *params)
+double HG_1to3_decay::RateintegrandE1(double E1, void *params)
 {
     double result;
     double *par = (double*)params;
@@ -622,30 +627,31 @@ double HG_2to2_Scattering::RateintegrandE1(double E1, void *params)
 
     double E2_min;
     double E2_max;
-    double min_1 = Eq*m[1]*m[1]/(m[1]*m[1] - t) + (m[1]*m[1] - t)/4/Eq;
+    double min_1 = Eq*m[1]*m[1]/(t - m[1]*m[1]) + (t - m[1]*m[1])/4/Eq;
 
-   double a = - (s + t - m[1]*m[1] - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]);
-   double b = Eq*((s + t - m[1]*m[1] - m[2]*m[2])*(s - m[0]*m[0] - m[1]*m[1]) 
-              - 2*m[0]*m[0]*(m[1]*m[1] - t)) + E1*(m[1]*m[1] - t)
-              *(s + t - m[1]*m[1] - m[2]*m[2]);
-   double c = - (t - m[1]*m[1])*(t - m[1]*m[1])*E1*E1
-              - 2*Eq*(2*m[1]*m[1]*(s + t - m[1]*m[1] - m[2]*m[2]) 
-              - (m[1]*m[1] - t)*(s - m[0]*m[0] - m[1]*m[1]))*E1
-              + 4*Eq*Eq*m[0]*m[0]*m[1]*m[1] + m[1]*m[1]*(s + t - m[1]*m[1] 
-              - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]) + m[0]*m[0]
-              *(m[1]*m[1] -t)*(m[1]*m[1] -t)
-              - Eq*Eq*(s - m[0]*m[0] - m[1]*m[1])*(s - m[0]*m[0] - m[1]*m[1])
-              + (s - m[0]*m[0] - m[1]*m[1])*(t - m[1]*m[1])*(s + t - m[1]*m[1] 
-              - m[2]*m[2]);
+    double a = - (s + t - m[1]*m[1] - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]);
+    double b = - Eq*((s + t - m[1]*m[1] - m[2]*m[2])*(s - m[0]*m[0] - m[1]*m[1]) 
+               - 2*m[0]*m[0]*(m[1]*m[1] - t)) - E1*(m[1]*m[1] - t)
+               *(s + t - m[1]*m[1] - m[2]*m[2]);
+    double c = - (t - m[1]*m[1])*(t - m[1]*m[1])*E1*E1
+               - 2*Eq*(2*m[1]*m[1]*(s + t - m[1]*m[1] - m[2]*m[2]) 
+               - (m[1]*m[1] - t)*(s - m[0]*m[0] - m[1]*m[1]))*E1
+               + 4*Eq*Eq*m[0]*m[0]*m[1]*m[1] + m[1]*m[1]*(s + t - m[1]*m[1] 
+               - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]) + m[0]*m[0]
+               *(m[1]*m[1] -t)*(m[1]*m[1] -t)
+               - Eq*Eq*(s - m[0]*m[0] - m[1]*m[1])*(s - m[0]*m[0] - m[1]*m[1])
+               + (s - m[0]*m[0] - m[1]*m[1])*(t - m[1]*m[1])*(s + t - m[1]*m[1] 
+               - m[2]*m[2]);
+
     
     if((b*b - a*c) >= 0) 
     {
-       double min_2 = (-b + sqrt(b*b - a*c))/(a + eps);
+       double min_2 = (-b + sqrt(b*b - a*c))/a;
        if(min_1 < min_2)
           E2_min = min_2;
        else
           E2_min = min_1;
-       E2_max = (-b - sqrt(b*b - a*c))/(a - eps);
+       E2_max = (-b - sqrt(b*b - a*c))/a;
 
        if(E2_max < E2_min) return(0.0);
 
@@ -688,7 +694,7 @@ double HG_2to2_Scattering::RateintegrandE1(double E1, void *params)
     return(result);
 }
 
-double HG_2to2_Scattering::RateintegrandE2(double E2, void *params)
+double HG_1to3_decay::RateintegrandE2(double E2, void *params)
 {
     double *par = (double*)params;
     int rateType = (int) par[0];
@@ -706,9 +712,9 @@ double HG_2to2_Scattering::RateintegrandE2(double E2, void *params)
     double mu3 = mu[2];
     double f0_E1 = Bose_distribution(E1, Temp, mu1);
     double f0_E2 = Bose_distribution(E2, Temp, mu2);
-    double f0_E3 = Bose_distribution(E1 + E2 - Eq, Temp, mu3);
-    //double common_factor = f0_E1*f0_E2*(1 + f0_E3)/(sqrt(a*E2*E2 + 2*b*E2 + c) + eps);
-    double common_factor = f0_E1*f0_E2*(1 + f0_E3);
+    double f0_E3 = Bose_distribution(E1 - E2 - Eq, Temp, mu3);
+    //double common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2*E2 + 2*b*E2 + c) + eps);
+    double common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3);
  
     double result;
     if(rateType == 0)
@@ -721,7 +727,7 @@ double HG_2to2_Scattering::RateintegrandE2(double E2, void *params)
     return(result);
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq(double s, double t)
 {
    double result;
    switch(channel)
@@ -758,7 +764,7 @@ double HG_2to2_Scattering::Matrix_elements_sq(double s, double t)
    return(result);
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C1(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C1(double s, double t)
 {
   //pi + rho -> pi + gamma
   double isospin_factor_C1p1 = 2.0;
@@ -770,7 +776,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C1(double s, double t)
   return (result);  
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C1_omega(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C1_omega(double s, double t)
 {
   //pi + rho -> omega -> pi + gamma
   double isospin_factor_C1p4 = 1.0;
@@ -782,7 +788,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C1_omega(double s, double t)
   return (result);
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C2(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C2(double s, double t)
 {
   //pi + pi -> rho + gamma
   double isospin_factor_C2p1 = 1.0;
@@ -792,7 +798,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C2(double s, double t)
   return (result);  
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C3(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C3(double s, double t)
 {
   //rho -> pi + pi + gamma
   double isospin_factor_C3p1 = 1.0;
@@ -802,7 +808,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C3(double s, double t)
   return (result);  
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C4(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C4(double s, double t)
 {
   //pi + Kstar -> K + gamma
   double isospin_factor_C4p1 = 4.0;
@@ -812,7 +818,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C4(double s, double t)
   return (result);
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C5(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C5(double s, double t)
 {
   //pi + K -> Kstar + gamma
   double isospin_factor_C5p1 = 4.0;
@@ -822,7 +828,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C5(double s, double t)
   return (result);
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C6(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C6(double s, double t)
 {
   //rho + K -> K + gamma
   double isospin_factor_C6p1 = 4.0;
@@ -832,7 +838,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C6(double s, double t)
   return (result);
 }
 
-double HG_2to2_Scattering::Matrix_elements_sq_C7(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C7(double s, double t)
 {
   //K + Kstar -> pi + gamma
   double isospin_factor_C7p1 = 4.0;
@@ -849,7 +855,7 @@ double HG_2to2_Scattering::Matrix_elements_sq_C7(double s, double t)
 /*************************************************************************************/
 //pi + rho -> pi + gamma  (C1.1 + C1.2 + C1.3)
 /*************************************************************************************/
-double HG_2to2_Scattering::C1p1(double s, double t)
+double HG_1to3_decay::C1p1(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -986,7 +992,7 @@ double HG_2to2_Scattering::C1p1(double s, double t)
     return(result);
 }
 
-double HG_2to2_Scattering::C1p2(double s, double t)
+double HG_1to3_decay::C1p2(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1089,7 +1095,7 @@ double HG_2to2_Scattering::C1p2(double s, double t)
     return(result);
 }
 
-double HG_2to2_Scattering::C1p3(double s, double t)
+double HG_1to3_decay::C1p3(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1193,7 +1199,7 @@ double HG_2to2_Scattering::C1p3(double s, double t)
 //pi + rho -> omega -> pi + gamma  (C1.4 + C1.5 + C1.6)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C1p4(double s, double t)
+double HG_1to3_decay::C1p4(double s, double t)
 {
    double C = 0.059;
    double gorp = 22.6;
@@ -1219,7 +1225,7 @@ double HG_2to2_Scattering::C1p4(double s, double t)
    return(result);
 }
 
-double HG_2to2_Scattering::C1p5(double s, double t)
+double HG_1to3_decay::C1p5(double s, double t)
 {
    double C = 0.059;
    double gorp = 22.6;
@@ -1234,7 +1240,7 @@ double HG_2to2_Scattering::C1p5(double s, double t)
    return(result);
 }
 
-double HG_2to2_Scattering::C1p6(double s, double t)
+double HG_1to3_decay::C1p6(double s, double t)
 {
    double C = 0.059;
    double gorp = 22.6;
@@ -1253,7 +1259,7 @@ double HG_2to2_Scattering::C1p6(double s, double t)
 //pi + pi -> rho + gamma  (C2.1 + C2.2)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C2p1(double s, double t)
+double HG_1to3_decay::C2p1(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1416,7 +1422,7 @@ double HG_2to2_Scattering::C2p1(double s, double t)
    return(result);
 }
 
-double HG_2to2_Scattering::C2p2(double s, double t)
+double HG_1to3_decay::C2p2(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1519,7 +1525,7 @@ double HG_2to2_Scattering::C2p2(double s, double t)
 //rho -> pi + pi + gamma  (C3.1 + C3.2)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C3p1(double s, double t)
+double HG_1to3_decay::C3p1(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1657,7 +1663,7 @@ double HG_2to2_Scattering::C3p1(double s, double t)
 
 }
 
-double HG_2to2_Scattering::C3p2(double s, double t)
+double HG_1to3_decay::C3p2(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1763,7 +1769,7 @@ double HG_2to2_Scattering::C3p2(double s, double t)
 //pi + Kstar -> K + gamma  (C4.1 + C4.2)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C4p1(double s, double t)
+double HG_1to3_decay::C4p1(double s, double t)
 {
    double C = 0.059;
    double gk = 9.2;
@@ -1814,7 +1820,7 @@ double HG_2to2_Scattering::C4p1(double s, double t)
    return(result);
 }
 
-double HG_2to2_Scattering::C4p2(double s, double t)
+double HG_1to3_decay::C4p2(double s, double t)
 {
    double C = 0.059;
    double gk = 9.2;
@@ -1853,7 +1859,7 @@ double HG_2to2_Scattering::C4p2(double s, double t)
 //pi + K -> Kstar + gamma  (C5.1 + C5.2)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C5p1(double s, double t)
+double HG_1to3_decay::C5p1(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1911,7 +1917,7 @@ double HG_2to2_Scattering::C5p1(double s, double t)
    return(result);
 }
 
-double HG_2to2_Scattering::C5p2(double s, double t)
+double HG_1to3_decay::C5p2(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1953,7 +1959,7 @@ double HG_2to2_Scattering::C5p2(double s, double t)
 //rho + K -> K + gamma  (C6.1 + C6.2)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C6p1(double s, double t)
+double HG_1to3_decay::C6p1(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1989,7 +1995,7 @@ double HG_2to2_Scattering::C6p1(double s, double t)
   return(result);
 }
 
-double HG_2to2_Scattering::C6p2(double s, double t)
+double HG_1to3_decay::C6p2(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -2022,7 +2028,7 @@ double HG_2to2_Scattering::C6p2(double s, double t)
 //K + Kstar -> pi + gamma  (C7.1 + C7.2)
 /*************************************************************************************/
 
-double HG_2to2_Scattering::C7p1(double s, double t)
+double HG_1to3_decay::C7p1(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -2083,7 +2089,7 @@ double HG_2to2_Scattering::C7p1(double s, double t)
   return(result);
 }
 
-double HG_2to2_Scattering::C7p2(double s, double t)
+double HG_1to3_decay::C7p2(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -2122,7 +2128,7 @@ double HG_2to2_Scattering::C7p2(double s, double t)
   return(result);
 }
 
-double HG_2to2_Scattering::Power(double x, int a)
+double HG_1to3_decay::Power(double x, int a)
 {
     return(pow(x,a));
 }
