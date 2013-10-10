@@ -231,15 +231,16 @@ int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr
 
           double gslresult_eq, gslerror_eq;
           int status;
+          int gslQAGkey = 2;
           gsl_function gslFunc;
           gslFunc.function = this->CCallback_Rateintegrands;
           gslFunc.params = Callback_params;
-          status = gsl_integration_qagiu(&gslFunc, s_min, 0, 1e-4, maxInteration, gsl_workSpace, &gslresult_eq, &gslerror_eq);
+          status = gsl_integration_qag(&gslFunc, s_min, s_max, eps, 1e-5, maxInteration, gslQAGkey, gsl_workSpace, &gslresult_eq, &gslerror_eq);
 
           double gslresult_vis, gslerror_vis;
           rateType = 1;
           paramsPtr[0] = rateType;
-          status = gsl_integration_qagiu(&gslFunc, s_min, 0, 1e-4, maxInteration, gsl_workSpace, &gslresult_vis, &gslerror_vis);
+          status = gsl_integration_qag(&gslFunc, s_min, s_max, eps, 1e-5, maxInteration, gslQAGkey, gsl_workSpace, &gslresult_vis, &gslerror_vis);
 
           gsl_integration_workspace_free(gsl_workSpace);
           delete Callback_params;
@@ -568,6 +569,7 @@ double HG_1to3_decay::Rateintegrands(double s, void *params)
     int gslQAGkey = 2;
     status = gsl_integration_qag(&gslFunc, t_min, t_max, eps, 1e-5, maxInteration, gslQAGkey, gsl_workSpace, &gslresult, &gslerror);
 
+
     gsl_integration_workspace_free(gsl_workSpace);
     delete Callback_params;
     delete [] paramsPtr;
@@ -646,9 +648,13 @@ double HG_1to3_decay::RateintegrandE1(double E1, void *params)
     
     if((b*b - a*c) >= 0) 
     {
+       int integrandForm = 1;
        double min_2 = (-b + sqrt(b*b - a*c))/a;
        if(min_1 < min_2)
+       {
           E2_min = min_2;
+          integrandForm = 2;
+       }
        else
           E2_min = min_1;
        E2_max = (-b - sqrt(b*b - a*c))/a;
@@ -662,9 +668,9 @@ double HG_1to3_decay::RateintegrandE1(double E1, void *params)
        paramsPtr[3] = s;
        paramsPtr[4] = t;
        paramsPtr[5] = E1;
-       paramsPtr[6] = a;
-       paramsPtr[7] = b;
-       paramsPtr[8] = c;
+       paramsPtr[6] = integrandForm;
+       paramsPtr[7] = min_2;
+       paramsPtr[8] = a;
        CCallbackHolder *Callback_params = new CCallbackHolder;
        Callback_params->clsPtr = this;
        Callback_params->params = paramsPtr;
@@ -675,10 +681,19 @@ double HG_1to3_decay::RateintegrandE1(double E1, void *params)
        gsl_function gslFunc;
        gslFunc.function = this->CCallback_RateintegrandE2;
        gslFunc.params = Callback_params;
-       gsl_integration_qaws_table* gslQAWSptr = gsl_integration_qaws_table_alloc(-0.5, -0.5, 0, 0);
+       gsl_integration_qaws_table* gslQAWSptr;
+       if(integrandForm == 2)
+       {
+          gslQAWSptr = gsl_integration_qaws_table_alloc(-0.5, -0.5, 0, 0);
+          status = gsl_integration_qaws(&gslFunc, E2_min+eps, E2_max-eps, gslQAWSptr, eps, 1e-5, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+       }
+       else
+       {
+          gslQAWSptr = gsl_integration_qaws_table_alloc(0.0, -0.5, 0, 0);
+          status = gsl_integration_qaws(&gslFunc, E2_min+eps, E2_max-eps, gslQAWSptr, eps, 1e-5, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+       }
        
-//       gsl_integration_qags(&gslFunc, E2_min+eps, E2_max-eps, 0, 1e-4, maxInteration, gsl_workSpace, &gslresult, &gslerror);
-       status = gsl_integration_qaws(&gslFunc, E2_min+eps, E2_max-eps, gslQAWSptr, eps, 1e-5, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+       //gsl_integration_qags(&gslFunc, E1_min+eps, E2_max-eps, 0, 1e-4, maxInteration, gsl_workSpace, &gslresult, &gslerror);
 
        gsl_integration_qaws_table_free(gslQAWSptr);
        gsl_integration_workspace_free(gsl_workSpace);
@@ -703,9 +718,9 @@ double HG_1to3_decay::RateintegrandE2(double E2, void *params)
     double s = par[3];
     double t = par[4];
     double E1 = par[5];
-    double a = par[6];
-    double b = par[7];
-    double c = par[8];
+    int integrandForm = (int) par[6];
+    double min_2 = par[7];
+    double a = par[8];
 
     double mu1 = mu[0];
     double mu2 = mu[1];
@@ -714,7 +729,12 @@ double HG_1to3_decay::RateintegrandE2(double E2, void *params)
     double f0_E2 = Bose_distribution(E2, Temp, mu2);
     double f0_E3 = Bose_distribution(E1 - E2 - Eq, Temp, mu3);
     //double common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2*E2 + 2*b*E2 + c) + eps);
-    double common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3);
+    double common_factor;
+    if(integrandForm == 2)
+       common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/sqrt(-a);
+    else
+       common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/sqrt((-a)*(E2 - min_2));
+
  
     double result;
     if(rateType == 0)
