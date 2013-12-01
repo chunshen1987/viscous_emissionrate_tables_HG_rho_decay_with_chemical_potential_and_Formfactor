@@ -207,46 +207,8 @@ int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr
              viscous_result_s += viscous_result_t*s_weight[k];
           }
           
-          //integrate using gsl routines
-          cout << T << "   " << Eq << endl;
-          cout << equilibrium_result_s << "   " << viscous_result_s << endl;
-          if(m[0] < (m[1] + m[2]))
-          {
-             cout << "Error: decay particle mass is smaller than daughter particles! Please check!" << endl;
-             exit(0);
-          }
-          double s_min = m[2]*m[2];
-          double s_max = (m[0]-m[1])*(m[0]-m[1]);
-          
-          double rateType = 0;   // rateType = 0 for equilibrium rates, rateType = 1 for viscous correction
-          double *paramsPtr = new double [3];
-          paramsPtr[0] = rateType;
-          paramsPtr[1] = T;
-          paramsPtr[2] = Eq;
-          CCallbackHolder *Callback_params = new CCallbackHolder;
-          Callback_params->clsPtr = this;
-          Callback_params->params = paramsPtr;
-          int maxInteration = 1000;
-          gsl_integration_workspace *gsl_workSpace = gsl_integration_workspace_alloc(maxInteration);
-
-          double gslresult_eq, gslerror_eq;
-          int status;
-          int gslQAGkey = 2;
-          gsl_function gslFunc;
-          gslFunc.function = this->CCallback_Rateintegrands;
-          gslFunc.params = Callback_params;
-          status = gsl_integration_qag(&gslFunc, s_min, s_max, eps, 1e-5, maxInteration, gslQAGkey, gsl_workSpace, &gslresult_eq, &gslerror_eq);
-
-          double gslresult_vis, gslerror_vis;
-          rateType = 1;
-          paramsPtr[0] = rateType;
-          status = gsl_integration_qag(&gslFunc, s_min, s_max, eps, 1e-5, maxInteration, gslQAGkey, gsl_workSpace, &gslresult_vis, &gslerror_vis);
-
-          gsl_integration_workspace_free(gsl_workSpace);
-          delete Callback_params;
-          cout << gslresult_eq << "   " << gslresult_vis << endl;
-          equilibrium_results[i][j] = gslresult_eq*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
-          viscous_results[i][j] = gslresult_vis*prefactor/(Eq*Eq)/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
+          equilibrium_results[i][j] = equilibrium_result_s*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
+          viscous_results[i][j] = viscous_result_s*prefactor/(Eq*Eq)/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
       }
    }
    output_emissionrateTable();
@@ -256,6 +218,7 @@ int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr
    delete[] mu3_tb;
    delete[] Formfactor_tb;
    delete [] results;
+   return 0;
 }
 
 
