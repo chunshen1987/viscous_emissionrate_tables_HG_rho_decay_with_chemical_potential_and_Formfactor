@@ -24,7 +24,7 @@ int main(int argc, char** argv)
    Chemical_potential* chempotential_ptr;
    Chemical_potential chemicalpotenital;
    chempotential_ptr = &chemicalpotenital;
-   chempotential_ptr->readin_chempotential_table("chemical_potential_tb/s95p/s95p-PCE150-v1/s95p-v1-PCE150_chemvsT.dat");
+   chempotential_ptr->readin_chempotential_table("chemical_potential_tb/s95p/s95p-PCE165-v0/s95p-v0-PCE165_chemvsT.dat");
    chempotential_ptr->Set_chemical_potential_s95pv0PCE();
 
    int channel = 0;
@@ -35,12 +35,12 @@ int main(int argc, char** argv)
    paraRdr->readFromFile("parameters.dat");
    paraRdr->readFromArguments(argc, argv);
 
-   HG_1to3_decay test(paraRdr);
+   HG_1to3_decay HG1to3Rates(paraRdr);
 
    //C.3
    filename = "rho_to_pion_pion_gamma";
    channel = 8;
-   test.Calculate_emissionrates(chempotential_ptr, channel, filename);
+   HG1to3Rates.Calculate_emissionrates(chempotential_ptr, channel, filename);
 
    sw.toc();
    cout << "totally takes : " << sw.takeTime() << "sec." << endl;
