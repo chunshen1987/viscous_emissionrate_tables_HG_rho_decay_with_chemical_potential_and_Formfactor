@@ -7,10 +7,710 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "Matrix_elements_sq.h"
+#include <gsl/gsl_integration.h>
+
+#include "HG_1to3_decay.h"
+#include "ParameterReader.h"
+#include "Physicalconstants.h"
+#include "gauss_quadrature.h"
+#include "Arsenal.h"
+#include "Formfactor.h"
+
 using namespace std;
 
-double Matrix_elements_sq(double s, double t, int channel)
+HG_1to3_decay::HG_1to3_decay(ParameterReader* paraRdr_in)
+{
+   eps = 1e-16;
+   paraRdr = paraRdr_in;
+
+   n_Eq = paraRdr->getVal("n_Eq");
+   double Eq_i = paraRdr->getVal("Eq_min");
+   double dEq = paraRdr->getVal("dEq");
+   Eq_tb = new double [n_Eq];
+   for(int i=0; i<n_Eq; i++)
+      Eq_tb[i] = Eq_i + i*dEq;
+
+   n_Temp = paraRdr->getVal("n_Temp");
+   double T_i = paraRdr->getVal("T_min");
+   double dT = paraRdr->getVal("dT");
+   T_tb = new double [n_Temp];
+   for(int i=0; i<n_Temp; i++)
+      T_tb[i] = T_i + i*dT;
+
+   equilibrium_results = new double* [n_Eq];
+   viscous_results = new double*[n_Eq];
+   for(int i=0; i<n_Eq; i++)
+   {
+      equilibrium_results[i] = new double [n_Temp];
+      viscous_results[i] = new double [n_Temp];
+   }
+   
+   //initialize the Gaussian quadrature lattices
+   n_s = paraRdr->getVal("n_s");
+   s_pt = new double [n_s];
+   s_weight = new double [n_s];
+   s_pt_standard = new double [n_s];
+   s_weight_standard = new double [n_s];
+   
+   t_pt = new double* [n_s];
+   t_weight = new double* [n_s];
+   t_pt_standard = new double* [n_s];
+   t_weight_standard = new double* [n_s];
+   Matrix_elements_sq_ptr = new double* [n_s];
+   n_t = paraRdr->getVal("n_t");
+   for(int i=0; i<n_s; i++)
+   {
+       t_pt[i] = new double [n_t];
+       t_weight[i] = new double [n_t];
+       t_pt_standard[i] = new double [n_t];
+       t_weight_standard[i] = new double [n_t];
+       Matrix_elements_sq_ptr[i] = new double [n_t];
+   }
+   
+   n_E1 = paraRdr->getVal("n_E1");
+   E1_pt_standard = new double [n_E1];
+   E1_weight_standard = new double [n_E1];
+   n_E2 = paraRdr->getVal("n_E2");
+   E2_pt_standard = new double* [3];
+   E2_weight_standard = new double* [3];
+   for(int i=0; i<3; i++)
+   {
+      E2_pt_standard[i] = new double [n_E2];
+      E2_weight_standard[i] = new double [n_E2];
+   }
+   
+   m = new double [3];
+   mu = new double [3];
+   deltaf_alpha = paraRdr->getVal("deltaf_alpha");
+
+}
+
+HG_1to3_decay::~HG_1to3_decay()
+{
+   delete[] Eq_tb;
+   delete[] T_tb;
+   for(int i=0; i<n_Eq; i++)
+   {
+      delete[] equilibrium_results[i];
+      delete[] viscous_results[i];
+   }
+   delete[] equilibrium_results;
+   delete[] viscous_results;
+
+   delete[] s_pt;
+   delete[] s_weight;
+   delete[] s_pt_standard;
+   delete[] s_weight_standard;
+   for(int i=0; i<n_s; i++)
+   {
+      delete[] t_pt[i];
+      delete[] t_weight[i];
+      delete[] t_pt_standard[i];
+      delete[] t_weight_standard[i];
+      delete[] Matrix_elements_sq_ptr[i];
+   }
+   delete[] t_pt;
+   delete[] t_weight;
+   delete[] t_pt_standard;
+   delete[] t_weight_standard;
+   delete[] Matrix_elements_sq_ptr;
+   
+   delete[] E1_pt_standard;
+   delete[] E1_weight_standard;
+   for(int i=0; i<3; i++)
+   {
+      delete[] E2_pt_standard[i];
+      delete[] E2_weight_standard[i];
+   }
+   delete[] E2_pt_standard;
+   delete[] E2_weight_standard;
+   delete[] m;
+   delete[] mu;
+
+}
+
+void HG_1to3_decay::output_emissionrateTable()
+{
+   ostringstream output_file_eqrate;
+   ostringstream output_file_viscous;
+   output_file_eqrate << "rate_" << filename << "_eqrate.dat";
+   output_file_viscous << "rate_" << filename << "_viscous.dat";
+   ofstream of_eqrate(output_file_eqrate.str().c_str());
+   ofstream of_viscous(output_file_viscous.str().c_str());
+   for(int j=0; j<n_Temp; j++)
+   {
+      for(int i=0; i<n_Eq; i++)
+      {
+         of_eqrate << scientific << setw(20) << setprecision(8)
+                   << equilibrium_results[i][j] << "   ";
+         of_viscous << scientific << setw(20) << setprecision(8)
+                   << viscous_results[i][j] << "   ";
+      }
+      of_eqrate << endl;
+      of_viscous << endl;
+   }
+}
+
+int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel_in, string filename_in)
+{
+   double* results = new double [2];
+
+   filename = filename_in; 
+   channel = channel_in;
+
+   set_particleMass();
+   set_gausspoints();
+   
+   // calculate matrix elements squared
+   for(int i=0; i<n_s; i++)
+      for(int j=0; j<n_t; j++)
+           Matrix_elements_sq_ptr[i][j] = Matrix_elements_sq(s_pt[i], t_pt[i][j]);
+
+   double* Formfactor_tb = new double [n_Eq];
+   double* mu1_tb = new double [n_Temp];
+   double* mu2_tb = new double [n_Temp];
+   double* mu3_tb = new double [n_Temp];
+
+   // calculate form factor
+   Calculate_Formfactor(Eq_tb, Formfactor_tb, n_Eq, channel);
+   // calculate chemical potenitals
+   chempotential_ptr->Calculate_mu(T_tb, mu1_tb, mu2_tb, mu3_tb, n_Temp, channel);
+
+   double Eq;
+   double formfactor;
+   double T;
+   for(int j=0; j<n_Temp; j++)
+   {
+      T = T_tb[j];
+      mu[0] = mu1_tb[j];
+      mu[1] = mu2_tb[j];
+      mu[2] = mu3_tb[j];
+      for(int i=0; i<n_Eq; i++)
+      {
+          Eq = Eq_tb[i];
+          formfactor = Formfactor_tb[i];
+          double prefactor = 1./16./pow(2.0*M_PI, 7)/Eq*formfactor;
+          
+          double equilibrium_result_s = 0.0;
+          double viscous_result_s = 0.0;
+          for(int k=0; k<n_s; k++)
+          {
+             double equilibrium_result_t = 0.0;
+             double viscous_result_t = 0.0;
+             for(int l=0; l<n_t; l++)
+             {
+                Integrate_E1(Eq, T, s_pt[k], t_pt[k][l], results);
+                equilibrium_result_t += Matrix_elements_sq_ptr[k][l]*results[0]*t_weight[k][l];
+                viscous_result_t += Matrix_elements_sq_ptr[k][l]*results[1]*t_weight[k][l];
+             }
+             equilibrium_result_s += equilibrium_result_t*s_weight[k];
+             viscous_result_s += viscous_result_t*s_weight[k];
+          }
+          
+          equilibrium_results[i][j] = equilibrium_result_s*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
+          viscous_results[i][j] = viscous_result_s*prefactor/(Eq*Eq)/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
+      }
+   }
+   output_emissionrateTable();
+
+   delete[] mu1_tb;
+   delete[] mu2_tb;
+   delete[] mu3_tb;
+   delete[] Formfactor_tb;
+   delete [] results;
+   return 0;
+}
+
+
+void HG_1to3_decay::set_gausspoints()
+{
+   if(m[0] < (m[1] + m[2]))
+   {
+      cout << "Error: decay particle mass is smaller than daughter particles! Please check!" << endl;
+      exit(0);
+   }
+   double s_min = m[2]*m[2];
+   double s_max = (m[0]-m[1])*(m[0]-m[1]);
+  
+   gauss_quadrature(n_s, 1, 0.0, 0.0, s_min, s_max, s_pt, s_weight);
+  
+   for(int i=0; i<n_s; i++)
+   {
+      double s = s_pt[i];
+      double t_min;
+      double t_max;
+      t_min = m[0]*m[0] + m[2]*m[2] - 2*(s + m[0]*m[0] - m[1]*m[1])*(s+m[2]*m[2])
+              /4/s - 2*sqrt((s+m[0]*m[0]-m[1]*m[1])*(s+m[0]*m[0]-m[1]*m[1]) 
+              - 4*s*m[0]*m[0])*(s - m[2]*m[2])/4/s;
+      t_max = m[0]*m[0] + m[2]*m[2] - 2*(s + m[0]*m[0] - m[1]*m[1])*(s+m[2]*m[2])
+              /4/s + 2*sqrt((s+m[0]*m[0]-m[1]*m[1])*(s+m[0]*m[0]-m[1]*m[1])
+              - 4*s*m[0]*m[0])*(s - m[2]*m[2])/4/s;
+
+      gauss_quadrature(n_t, 1, 0.0, 0.0, t_min, t_max, t_pt[i], t_weight[i]);
+    }
+    
+    gauss_quadrature_standard(n_E1, 5, 0.0, 0.0, 0.0, 1.0, E1_pt_standard, E1_weight_standard);
+
+    // use Chebyshev–Gauss quadrature for channels: pi + rho, pi + Kstar, rho + K, and K + Kstar
+    gauss_quadrature_standard(n_E2, 2, 0.0, 0.0, 0.0, 1.0, E2_pt_standard[0], E2_weight_standard[0]);
+
+    // use Jacobi-Gauss quadrature for channels: pi + pi, pi + K
+    gauss_quadrature_standard(n_E2, 4, 0.0, -0.5, 0.0, 1.0, E2_pt_standard[1], E2_weight_standard[1]);
+    gauss_quadrature_standard(n_E2, 4, -0.5, 0.0, 0.0, 1.0, E2_pt_standard[2], E2_weight_standard[2]);
+
+    return;
+}
+
+void HG_1to3_decay::set_particleMass()
+{
+   if(channel == 1)
+   {
+      m[0] = mrho;
+      m[1] = mpion;
+      m[2] = mpion;
+   }
+   else if (channel == 2)
+   {
+      m[0] = mrho;
+      m[1] = mpion;
+      m[2] = mpion;
+   }
+   else if (channel == 3)
+   {
+      m[0] = mpion;
+      m[1] = mpion;
+      m[2] = mrho;
+   }
+   else if (channel == 4)
+   {
+      m[0] = mKstar;
+      m[1] = mpion;
+      m[2] = mK;
+   }
+   else if (channel == 5) 
+   {
+      m[0] = mK;
+      m[1] = mpion;
+      m[2] = mKstar;
+   }
+   else if (channel == 6)
+   {
+      m[0] = mrho;
+      m[1] = mK;
+      m[2] = mK;
+   }
+   else if (channel == 7)
+   {
+      m[0] = mKstar;
+      m[1] = mK;
+      m[2] = mpion;
+   }
+   else if (channel == 8)
+   {
+      m[0] = mrho;
+      m[1] = mpion;
+      m[2] = mpion;
+   }
+   else
+   {
+      cout << "Error:: set_particleMass: input channel is invalide, channel = " << channel << endl;
+      exit(1);
+   }
+   return;
+}
+
+
+double HG_1to3_decay::Integrate_E1(double Eq, double T, double s, double t, double* results)
+{
+   double equilibrium_result = 0.0e0;
+   double viscous_result = 0.0e0;
+   double E1_min;
+   double u = - s - t + m[0]*m[0] + m[1]*m[1] + m[2]*m[2];
+   E1_min = Eq*m[0]*m[0]/(m[0]*m[0] - u) + (m[0]*m[0] - u)/4/Eq;
+
+   double* E1_pt = new double [n_E1];
+   double* E1_weight = new double [n_E1];
+   for(int i=0; i<n_E1; i++)
+   {
+      E1_pt[i] = E1_pt_standard[i];
+      E1_weight[i] = E1_weight_standard[i];
+   }
+   
+   double slope = 1./T;
+   scale_gausspoints(n_E1, 5, 0.0, 0.0, E1_min, slope, E1_pt, E1_weight);
+
+   for(int i=0; i<n_E1; i++)
+   {
+      Integrate_E2(Eq, T, s, t, E1_pt[i], results);
+      equilibrium_result += results[0]*E1_weight[i];
+      viscous_result += results[1]*E1_weight[i];
+   }
+   
+   results[0] = equilibrium_result;
+   results[1] = viscous_result;
+
+   delete[] E1_pt;
+   delete[] E1_weight;
+
+   return(0);
+}
+
+double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, double E1, double* results)
+{
+   double equilibrium_result = 0.0;
+   double viscous_result = 0.0;
+   double E2_min;
+   double E2_max;
+   double min_1 = Eq*m[1]*m[1]/(t - m[1]*m[1]) + (t - m[1]*m[1])/4/Eq;
+
+   double a = - (s + t - m[1]*m[1] - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]);
+   double b = - Eq*((s + t - m[1]*m[1] - m[2]*m[2])*(s - m[0]*m[0] - m[1]*m[1]) 
+              - 2*m[0]*m[0]*(m[1]*m[1] - t)) - E1*(m[1]*m[1] - t)
+              *(s + t - m[1]*m[1] - m[2]*m[2]);
+   double c = - (t - m[1]*m[1])*(t - m[1]*m[1])*E1*E1
+              - 2*Eq*(2*m[1]*m[1]*(s + t - m[1]*m[1] - m[2]*m[2]) 
+              - (m[1]*m[1] - t)*(s - m[0]*m[0] - m[1]*m[1]))*E1
+              + 4*Eq*Eq*m[0]*m[0]*m[1]*m[1] + m[1]*m[1]*(s + t - m[1]*m[1] 
+              - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]) + m[0]*m[0]
+              *(m[1]*m[1] -t)*(m[1]*m[1] -t)
+              - Eq*Eq*(s - m[0]*m[0] - m[1]*m[1])*(s - m[0]*m[0] - m[1]*m[1])
+              + (s - m[0]*m[0] - m[1]*m[1])*(t - m[1]*m[1])*(s + t - m[1]*m[1] 
+              - m[2]*m[2]);
+
+   if((b*b - a*c) >= 0) 
+   {
+      double min_2 = (-b + sqrt(b*b - a*c))/a;
+      if(min_1 < min_2)
+         E2_min = min_2;
+      else
+         E2_min = min_1;
+      E2_max = (-b - sqrt(b*b - a*c))/a;
+
+      if(E2_max < E2_min)
+      {
+         results[0] = 0.0e0;
+         results[1] = 0.0e0;
+         return (0.0);
+      }
+   
+      double mu1 = mu[0];
+      double mu2 = mu[1];
+      double mu3 = mu[2];
+      double common_factor;
+
+      double* E2_pt = new double [n_E2];
+      double* E2_weight = new double [n_E2];
+
+      if(channel == 3 || channel == 5)
+      {
+         double E2_cut = E2_min + (E2_max - E2_min)/100.;
+         for(int i=0; i<n_E2; i++)
+         {
+            E2_pt[i] = E2_pt_standard[1][i];
+            E2_weight[i] = E2_weight_standard[1][i];
+         }
+         scale_gausspoints(n_E2, 4, 0.0, -0.5, E2_min, E2_cut, E2_pt, E2_weight);
+         for(int i=0; i<n_E2; i++)
+         {
+            double f0_E1 = Bose_distribution(E1, T, mu1);
+            double f0_E2 = Bose_distribution(E2_pt[i], T, mu2);
+            double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
+            common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
+            equilibrium_result += common_factor*1.*E2_weight[i];
+            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+         }
+
+         for(int i=0; i<n_E2; i++)
+         {
+            E2_pt[i] = E2_pt_standard[2][i];
+            E2_weight[i] = E2_weight_standard[2][i];
+         }
+         scale_gausspoints(n_E2, 4, -0.5, 0.0, E2_cut, E2_max, E2_pt, E2_weight);
+         for(int i=0; i<n_E2; i++)
+         {
+            double f0_E1 = Bose_distribution(E1, T, mu1);
+            double f0_E2 = Bose_distribution(E2_pt[i], T, mu2);
+            double f0_E3 = Bose_distribution(E1 + E2_pt[i] - Eq, T, mu3);
+            common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
+            equilibrium_result += common_factor*1.*E2_weight[i];
+            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+         }
+      }
+      else
+      {
+         for(int i=0; i<n_E2; i++)
+         {
+            E2_pt[i] = E2_pt_standard[0][i];
+            E2_weight[i] = E2_weight_standard[0][i];
+         }
+         scale_gausspoints(n_E2, 2, 0.0, 0.0, E2_min, E2_max, E2_pt, E2_weight);
+         for(int i=0; i<n_E2; i++)
+         {
+            double f0_E1 = Bose_distribution(E1, T, mu1);
+            double f0_E2 = Bose_distribution(E2_pt[i], T, mu2);
+            double f0_E3 = Bose_distribution(E1 - E2_pt[i] - Eq, T, mu3);
+            common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
+            equilibrium_result += common_factor*1.*E2_weight[i];
+            viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+         }
+      }
+
+      delete[] E2_pt;
+      delete[] E2_weight;
+   }
+   else  // no kinematic phase space
+   {
+      equilibrium_result = 0.0e0;
+      viscous_result = 0.0e0;
+   }
+   results[0] = equilibrium_result;
+   results[1] = viscous_result;
+
+   return(0);
+}
+
+double HG_1to3_decay::viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3)
+{
+   double m1 = m[0];
+   double m2 = m[1];
+   double m3 = m[2];
+   double E3 = E1 - E2 - Eq;
+   double p1 = sqrt(E1*E1 - m1*m1);
+   double p2 = sqrt(E2*E2 - m2*m2);
+   double p3 = sqrt(E3*E3 - m3*m3);
+   double costheta1 = (- s - t + m2*m2 + m3*m3 + 2*E1*Eq)/(2*p1*Eq);
+   double costheta2 = ( - t + m2*m2 + 2*E2*Eq)/(2*p2*Eq);
+   double p3_z = p1*costheta1 - p2*costheta2 - Eq; 
+
+   double integrand = (1. + f0_E1)*deltaf_chi(p1/T)*0.5*(-1. + 3.*costheta1*costheta1) + f0_E2*deltaf_chi(p2/T)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3/T)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
+
+   return(integrand);
+}
+
+double HG_1to3_decay::Bose_distribution(double E, double T, double mu)
+{
+   return(1.0/(exp((E-mu)/T)-1.0));
+}
+
+double HG_1to3_decay::deltaf_chi(double p)
+{ 
+    return(pow(p, deltaf_alpha));
+}
+
+double HG_1to3_decay::Rateintegrands(double s, void *params)
+{
+    double *par = (double*)params;
+    double rateType = par[0];
+    double Temp = par[1];
+    double Eq = par[2];
+
+    double t_min, t_max;
+    t_min = m[0]*m[0] + m[2]*m[2] - 2*(s + m[0]*m[0] - m[1]*m[1])*(s+m[2]*m[2])
+            /4/s - 2*sqrt((s+m[0]*m[0]-m[1]*m[1])*(s+m[0]*m[0]-m[1]*m[1]) 
+            - 4*s*m[0]*m[0])*(s - m[2]*m[2])/4/s;
+    t_max = m[0]*m[0] + m[2]*m[2] - 2*(s + m[0]*m[0] - m[1]*m[1])*(s+m[2]*m[2])
+            /4/s + 2*sqrt((s+m[0]*m[0]-m[1]*m[1])*(s+m[0]*m[0]-m[1]*m[1])
+            - 4*s*m[0]*m[0])*(s - m[2]*m[2])/4/s;
+
+    double *paramsPtr = new double [4];
+    paramsPtr[0] = rateType;
+    paramsPtr[1] = Temp;
+    paramsPtr[2] = Eq;
+    paramsPtr[3] = s;
+    CCallbackHolder *Callback_params = new CCallbackHolder;
+    Callback_params->clsPtr = this;
+    Callback_params->params = paramsPtr;
+    int maxInteration = 1000;
+    gsl_integration_workspace *gsl_workSpace = gsl_integration_workspace_alloc(maxInteration);
+    double gslresult, gslerror;
+    int status;
+    gsl_function gslFunc;
+    gslFunc.function = this->CCallback_Rateintegrandt;
+    gslFunc.params = Callback_params;
+    
+    //gsl_integration_qags(&gslFunc, t_min, t_max, eps, 1e-4, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+    int gslQAGkey = 2;
+    status = gsl_integration_qag(&gslFunc, t_min, t_max, eps, 1e-5, maxInteration, gslQAGkey, gsl_workSpace, &gslresult, &gslerror);
+
+
+    gsl_integration_workspace_free(gsl_workSpace);
+    delete Callback_params;
+    delete [] paramsPtr;
+
+    return(gslresult);
+}
+
+double HG_1to3_decay::Rateintegrandt(double t, void *params)
+{
+    double *par = (double*)params;
+    double rateType = par[0];
+    double Temp = par[1];
+    double Eq = par[2];
+    double s = par[3];
+
+    double E1_min;
+    double u = - s - t + m[0]*m[0] + m[1]*m[1] + m[2]*m[2];
+    E1_min = Eq*m[0]*m[0]/(m[0]*m[0] - u) + (m[0]*m[0] - u)/4/Eq;
+
+    double *paramsPtr = new double [5];
+    paramsPtr[0] = rateType;
+    paramsPtr[1] = Temp;
+    paramsPtr[2] = Eq;
+    paramsPtr[3] = s;
+    paramsPtr[4] = t;
+    CCallbackHolder *Callback_params = new CCallbackHolder;
+    Callback_params->clsPtr = this;
+    Callback_params->params = paramsPtr;
+    int maxInteration = 1000;
+    gsl_integration_workspace *gsl_workSpace = gsl_integration_workspace_alloc(maxInteration);
+    double gslresult, gslerror;
+    int status;
+    gsl_function gslFunc;
+    gslFunc.function = this->CCallback_RateintegrandE1;
+    gslFunc.params = Callback_params;
+    
+    status = gsl_integration_qagiu(&gslFunc, E1_min, eps, 1e-5, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+
+    gsl_integration_workspace_free(gsl_workSpace);
+    delete Callback_params;
+    delete [] paramsPtr;
+
+    double matrixElementsSq = Matrix_elements_sq(s, t);
+
+    return(gslresult*matrixElementsSq);
+}
+
+double HG_1to3_decay::RateintegrandE1(double E1, void *params)
+{
+    double result;
+    double *par = (double*)params;
+    double rateType = par[0];
+    double Temp = par[1];
+    double Eq = par[2];
+    double s = par[3];
+    double t = par[4];
+
+    double E2_min;
+    double E2_max;
+    double min_1 = Eq*m[1]*m[1]/(t - m[1]*m[1]) + (t - m[1]*m[1])/4/Eq;
+
+    double a = - (s + t - m[1]*m[1] - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]);
+    double b = - Eq*((s + t - m[1]*m[1] - m[2]*m[2])*(s - m[0]*m[0] - m[1]*m[1]) 
+               - 2*m[0]*m[0]*(m[1]*m[1] - t)) - E1*(m[1]*m[1] - t)
+               *(s + t - m[1]*m[1] - m[2]*m[2]);
+    double c = - (t - m[1]*m[1])*(t - m[1]*m[1])*E1*E1
+               - 2*Eq*(2*m[1]*m[1]*(s + t - m[1]*m[1] - m[2]*m[2]) 
+               - (m[1]*m[1] - t)*(s - m[0]*m[0] - m[1]*m[1]))*E1
+               + 4*Eq*Eq*m[0]*m[0]*m[1]*m[1] + m[1]*m[1]*(s + t - m[1]*m[1] 
+               - m[2]*m[2])*(s + t - m[1]*m[1] - m[2]*m[2]) + m[0]*m[0]
+               *(m[1]*m[1] -t)*(m[1]*m[1] -t)
+               - Eq*Eq*(s - m[0]*m[0] - m[1]*m[1])*(s - m[0]*m[0] - m[1]*m[1])
+               + (s - m[0]*m[0] - m[1]*m[1])*(t - m[1]*m[1])*(s + t - m[1]*m[1] 
+               - m[2]*m[2]);
+
+    
+    if((b*b - a*c) >= 0) 
+    {
+       int integrandForm = 1;
+       double min_2 = (-b + sqrt(b*b - a*c))/a;
+       if(min_1 < min_2)
+       {
+          E2_min = min_2;
+          integrandForm = 2;
+       }
+       else
+          E2_min = min_1;
+       E2_max = (-b - sqrt(b*b - a*c))/a;
+
+       if(E2_max < E2_min) return(0.0);
+
+       double *paramsPtr = new double [9];
+       paramsPtr[0] = rateType;
+       paramsPtr[1] = Temp;
+       paramsPtr[2] = Eq;
+       paramsPtr[3] = s;
+       paramsPtr[4] = t;
+       paramsPtr[5] = E1;
+       paramsPtr[6] = integrandForm;
+       paramsPtr[7] = min_2;
+       paramsPtr[8] = a;
+       CCallbackHolder *Callback_params = new CCallbackHolder;
+       Callback_params->clsPtr = this;
+       Callback_params->params = paramsPtr;
+       int maxInteration = 1000;
+       gsl_integration_workspace *gsl_workSpace = gsl_integration_workspace_alloc(maxInteration);
+       double gslresult, gslerror;
+       int status;
+       gsl_function gslFunc;
+       gslFunc.function = this->CCallback_RateintegrandE2;
+       gslFunc.params = Callback_params;
+       gsl_integration_qaws_table* gslQAWSptr;
+       if(integrandForm == 2)
+       {
+          gslQAWSptr = gsl_integration_qaws_table_alloc(-0.5, -0.5, 0, 0);
+          status = gsl_integration_qaws(&gslFunc, E2_min+eps, E2_max-eps, gslQAWSptr, eps, 1e-5, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+       }
+       else
+       {
+          gslQAWSptr = gsl_integration_qaws_table_alloc(0.0, -0.5, 0, 0);
+          status = gsl_integration_qaws(&gslFunc, E2_min+eps, E2_max-eps, gslQAWSptr, eps, 1e-5, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+       }
+       
+       //gsl_integration_qags(&gslFunc, E1_min+eps, E2_max-eps, 0, 1e-4, maxInteration, gsl_workSpace, &gslresult, &gslerror);
+
+       gsl_integration_qaws_table_free(gslQAWSptr);
+       gsl_integration_workspace_free(gsl_workSpace);
+       delete Callback_params;
+       delete [] paramsPtr;
+
+       result = gslresult;
+    }
+    else  // no kinematic phase space
+    {
+       result = 0.0e0;
+    }
+    return(result);
+}
+
+double HG_1to3_decay::RateintegrandE2(double E2, void *params)
+{
+    double *par = (double*)params;
+    int rateType = (int) par[0];
+    double Temp = par[1];
+    double Eq = par[2];
+    double s = par[3];
+    double t = par[4];
+    double E1 = par[5];
+    int integrandForm = (int) par[6];
+    double min_2 = par[7];
+    double a = par[8];
+
+    double mu1 = mu[0];
+    double mu2 = mu[1];
+    double mu3 = mu[2];
+    double f0_E1 = Bose_distribution(E1, Temp, mu1);
+    double f0_E2 = Bose_distribution(E2, Temp, mu2);
+    double f0_E3 = Bose_distribution(E1 - E2 - Eq, Temp, mu3);
+    //double common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2*E2 + 2*b*E2 + c) + eps);
+    double common_factor;
+    if(integrandForm == 2)
+       common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/sqrt(-a);
+    else
+       common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/sqrt((-a)*(E2 - min_2));
+
+ 
+    double result;
+    if(rateType == 0)
+    {
+       result = common_factor;
+    }
+    else
+       result = common_factor*viscous_integrand(s, t, E1, E2, Eq, Temp, f0_E1, f0_E2, f0_E3);
+
+    return(result);
+}
+
+double HG_1to3_decay::Matrix_elements_sq(double s, double t)
 {
    double result;
    switch(channel)
@@ -47,7 +747,7 @@ double Matrix_elements_sq(double s, double t, int channel)
    return(result);
 }
 
-double Matrix_elements_sq_C1(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C1(double s, double t)
 {
   //pi + rho -> pi + gamma
   double isospin_factor_C1p1 = 2.0;
@@ -59,7 +759,7 @@ double Matrix_elements_sq_C1(double s, double t)
   return (result);  
 }
 
-double Matrix_elements_sq_C1_omega(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C1_omega(double s, double t)
 {
   //pi + rho -> omega -> pi + gamma
   double isospin_factor_C1p4 = 1.0;
@@ -71,7 +771,7 @@ double Matrix_elements_sq_C1_omega(double s, double t)
   return (result);
 }
 
-double Matrix_elements_sq_C2(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C2(double s, double t)
 {
   //pi + pi -> rho + gamma
   double isospin_factor_C2p1 = 1.0;
@@ -81,7 +781,7 @@ double Matrix_elements_sq_C2(double s, double t)
   return (result);  
 }
 
-double Matrix_elements_sq_C3(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C3(double s, double t)
 {
   //rho -> pi + pi + gamma
   double isospin_factor_C3p1 = 1.0;
@@ -91,7 +791,7 @@ double Matrix_elements_sq_C3(double s, double t)
   return (result);  
 }
 
-double Matrix_elements_sq_C4(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C4(double s, double t)
 {
   //pi + Kstar -> K + gamma
   double isospin_factor_C4p1 = 4.0;
@@ -101,7 +801,7 @@ double Matrix_elements_sq_C4(double s, double t)
   return (result);
 }
 
-double Matrix_elements_sq_C5(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C5(double s, double t)
 {
   //pi + K -> Kstar + gamma
   double isospin_factor_C5p1 = 4.0;
@@ -111,7 +811,7 @@ double Matrix_elements_sq_C5(double s, double t)
   return (result);
 }
 
-double Matrix_elements_sq_C6(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C6(double s, double t)
 {
   //rho + K -> K + gamma
   double isospin_factor_C6p1 = 4.0;
@@ -121,7 +821,7 @@ double Matrix_elements_sq_C6(double s, double t)
   return (result);
 }
 
-double Matrix_elements_sq_C7(double s, double t)
+double HG_1to3_decay::Matrix_elements_sq_C7(double s, double t)
 {
   //K + Kstar -> pi + gamma
   double isospin_factor_C7p1 = 4.0;
@@ -138,7 +838,7 @@ double Matrix_elements_sq_C7(double s, double t)
 /*************************************************************************************/
 //pi + rho -> pi + gamma  (C1.1 + C1.2 + C1.3)
 /*************************************************************************************/
-double C1p1(double s, double t)
+double HG_1to3_decay::C1p1(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -275,7 +975,7 @@ double C1p1(double s, double t)
     return(result);
 }
 
-double C1p2(double s, double t)
+double HG_1to3_decay::C1p2(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -378,7 +1078,7 @@ double C1p2(double s, double t)
     return(result);
 }
 
-double C1p3(double s, double t)
+double HG_1to3_decay::C1p3(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -482,7 +1182,7 @@ double C1p3(double s, double t)
 //pi + rho -> omega -> pi + gamma  (C1.4 + C1.5 + C1.6)
 /*************************************************************************************/
 
-double C1p4(double s, double t)
+double HG_1to3_decay::C1p4(double s, double t)
 {
    double C = 0.059;
    double gorp = 22.6;
@@ -508,7 +1208,7 @@ double C1p4(double s, double t)
    return(result);
 }
 
-double C1p5(double s, double t)
+double HG_1to3_decay::C1p5(double s, double t)
 {
    double C = 0.059;
    double gorp = 22.6;
@@ -523,7 +1223,7 @@ double C1p5(double s, double t)
    return(result);
 }
 
-double C1p6(double s, double t)
+double HG_1to3_decay::C1p6(double s, double t)
 {
    double C = 0.059;
    double gorp = 22.6;
@@ -542,7 +1242,7 @@ double C1p6(double s, double t)
 //pi + pi -> rho + gamma  (C2.1 + C2.2)
 /*************************************************************************************/
 
-double C2p1(double s, double t)
+double HG_1to3_decay::C2p1(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -705,7 +1405,7 @@ double C2p1(double s, double t)
    return(result);
 }
 
-double C2p2(double s, double t)
+double HG_1to3_decay::C2p2(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -808,7 +1508,7 @@ double C2p2(double s, double t)
 //rho -> pi + pi + gamma  (C3.1 + C3.2)
 /*************************************************************************************/
 
-double C3p1(double s, double t)
+double HG_1to3_decay::C3p1(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -946,7 +1646,7 @@ double C3p1(double s, double t)
 
 }
 
-double C3p2(double s, double t)
+double HG_1to3_decay::C3p2(double s, double t)
 {
    double C = 0.059;
    double ghat = g_tilde;
@@ -1052,7 +1752,7 @@ double C3p2(double s, double t)
 //pi + Kstar -> K + gamma  (C4.1 + C4.2)
 /*************************************************************************************/
 
-double C4p1(double s, double t)
+double HG_1to3_decay::C4p1(double s, double t)
 {
    double C = 0.059;
    double gk = 9.2;
@@ -1103,7 +1803,7 @@ double C4p1(double s, double t)
    return(result);
 }
 
-double C4p2(double s, double t)
+double HG_1to3_decay::C4p2(double s, double t)
 {
    double C = 0.059;
    double gk = 9.2;
@@ -1142,7 +1842,7 @@ double C4p2(double s, double t)
 //pi + K -> Kstar + gamma  (C5.1 + C5.2)
 /*************************************************************************************/
 
-double C5p1(double s, double t)
+double HG_1to3_decay::C5p1(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1200,7 +1900,7 @@ double C5p1(double s, double t)
    return(result);
 }
 
-double C5p2(double s, double t)
+double HG_1to3_decay::C5p2(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1242,7 +1942,7 @@ double C5p2(double s, double t)
 //rho + K -> K + gamma  (C6.1 + C6.2)
 /*************************************************************************************/
 
-double C6p1(double s, double t)
+double HG_1to3_decay::C6p1(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1278,7 +1978,7 @@ double C6p1(double s, double t)
   return(result);
 }
 
-double C6p2(double s, double t)
+double HG_1to3_decay::C6p2(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1311,7 +2011,7 @@ double C6p2(double s, double t)
 //K + Kstar -> pi + gamma  (C7.1 + C7.2)
 /*************************************************************************************/
 
-double C7p1(double s, double t)
+double HG_1to3_decay::C7p1(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1372,7 +2072,7 @@ double C7p1(double s, double t)
   return(result);
 }
 
-double C7p2(double s, double t)
+double HG_1to3_decay::C7p2(double s, double t)
 {
   double C = 0.059;
   double gk = 9.2;
@@ -1411,10 +2111,7 @@ double C7p2(double s, double t)
   return(result);
 }
 
-inline double Power(double x, int a)
+double HG_1to3_decay::Power(double x, int a)
 {
-    double result = 1.0;
-    for(int i=0; i<a; i++)
-       result *= x;
-    return(result);
+    return(pow(x,a));
 }

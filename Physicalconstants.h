@@ -1,5 +1,5 @@
-#ifndef PARAMETERS_H
-#define PARAMETERS_H
+#ifndef Physicalconstants_H
+#define Physicalconstants_H
 
 #include <cmath>
 
@@ -12,24 +12,6 @@ const double momega = 0.782;
 const double mKstar = 0.892;
 const double ma1 = 1.26;
 const double Gammaa1 = 0.4;  //decay width for a1
-
-// parameters for non-thermal equilibrium delta f correction
-const double deltaf_alpha = 2;   //the exponent of the p dependence of the delta f correction deltaf_alpha = 2 for democratic choice
-
-// parameters for numerical integrations
-const int n_s = 20;
-const int n_t = 20;
-
-const int n_E1 = 20;
-const int n_E2 = 20;
-
-// parameters for output photon emission rate table
-const int n_Eq = 80;
-const double Eq_i = 0.05;
-const double dEq = 0.05;
-const int n_Temp = 76;
-const double T_i = 0.10;
-const double dT = 0.002;
 
 // parameters for massive Yang-Mill theory
 const double gamma_parameter = -0.2913;

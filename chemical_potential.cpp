@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #include "Arsenal.h"
-#include "parameters.h"
+#include "Physicalconstants.h"
 #include "chemical_potential.h"
 using namespace std;
 
