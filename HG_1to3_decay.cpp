@@ -39,10 +39,12 @@ HG_1to3_decay::HG_1to3_decay(ParameterReader* paraRdr_in)
 
    equilibrium_results = new double* [n_Eq];
    viscous_results = new double*[n_Eq];
+   bulkvis_results = new double*[n_Eq];
    for(int i=0; i<n_Eq; i++)
    {
       equilibrium_results[i] = new double [n_Temp];
       viscous_results[i] = new double [n_Temp];
+      bulkvis_results[i] = new double [n_Temp];
    }
    
    //initialize the Gaussian quadrature lattices
@@ -93,9 +95,11 @@ HG_1to3_decay::~HG_1to3_decay()
    {
       delete[] equilibrium_results[i];
       delete[] viscous_results[i];
+      delete[] bulkvis_results[i];
    }
    delete[] equilibrium_results;
    delete[] viscous_results;
+   delete[] bulkvis_results;
 
    delete[] s_pt;
    delete[] s_weight;
@@ -133,10 +137,13 @@ void HG_1to3_decay::output_emissionrateTable()
 {
    ostringstream output_file_eqrate;
    ostringstream output_file_viscous;
+   ostringstream output_file_bulkvis;
    output_file_eqrate << "rate_" << filename << "_eqrate.dat";
    output_file_viscous << "rate_" << filename << "_viscous.dat";
+   output_file_bulkvis << "rate_" << filename << "_bulkvis.dat";
    ofstream of_eqrate(output_file_eqrate.str().c_str());
    ofstream of_viscous(output_file_viscous.str().c_str());
+   ofstream of_bulkvis(output_file_bulkvis.str().c_str());
    for(int j=0; j<n_Temp; j++)
    {
       for(int i=0; i<n_Eq; i++)
@@ -144,16 +151,19 @@ void HG_1to3_decay::output_emissionrateTable()
          of_eqrate << scientific << setw(20) << setprecision(8)
                    << equilibrium_results[i][j] << "   ";
          of_viscous << scientific << setw(20) << setprecision(8)
-                   << viscous_results[i][j] << "   ";
+                    << viscous_results[i][j] << "   ";
+         of_bulkvis << scientific << setw(20) << setprecision(8)
+                    << bulkvis_results[i][j] << "   ";
       }
       of_eqrate << endl;
       of_viscous << endl;
+      of_bulkvis << endl;
    }
 }
 
 int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel_in, string filename_in)
 {
-   double* results = new double [2];
+   double* results = new double [3];
 
    filename = filename_in; 
    channel = channel_in;
@@ -193,22 +203,27 @@ int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr
           
           double equilibrium_result_s = 0.0;
           double viscous_result_s = 0.0;
+          double bulkvis_result_s = 0.0;
           for(int k=0; k<n_s; k++)
           {
              double equilibrium_result_t = 0.0;
              double viscous_result_t = 0.0;
+             double bulkvis_result_t = 0.0;
              for(int l=0; l<n_t; l++)
              {
                 Integrate_E1(Eq, T, s_pt[k], t_pt[k][l], results);
                 equilibrium_result_t += Matrix_elements_sq_ptr[k][l]*results[0]*t_weight[k][l];
                 viscous_result_t += Matrix_elements_sq_ptr[k][l]*results[1]*t_weight[k][l];
+                bulkvis_result_t += Matrix_elements_sq_ptr[k][l]*results[2]*t_weight[k][l];
              }
              equilibrium_result_s += equilibrium_result_t*s_weight[k];
              viscous_result_s += viscous_result_t*s_weight[k];
+             bulkvis_result_s += bulkvis_result_t*s_weight[k];
           }
           
           equilibrium_results[i][j] = equilibrium_result_s*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^2 fm^4) for the emission rates
           viscous_results[i][j] = viscous_result_s*prefactor/(Eq*Eq)/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
+          bulkvis_results[i][j] = bulkvis_result_s*prefactor/pow(hbarC, 4); // convert units to 1/(GeV^4 fm^4) for the emission rates
       }
    }
    output_emissionrateTable();
@@ -324,6 +339,7 @@ double HG_1to3_decay::Integrate_E1(double Eq, double T, double s, double t, doub
 {
    double equilibrium_result = 0.0e0;
    double viscous_result = 0.0e0;
+   double bulkvis_result = 0.0e0;
    double E1_min;
    double u = - s - t + m[0]*m[0] + m[1]*m[1] + m[2]*m[2];
    E1_min = Eq*m[0]*m[0]/(m[0]*m[0] - u) + (m[0]*m[0] - u)/4/Eq;
@@ -344,10 +360,12 @@ double HG_1to3_decay::Integrate_E1(double Eq, double T, double s, double t, doub
       Integrate_E2(Eq, T, s, t, E1_pt[i], results);
       equilibrium_result += results[0]*E1_weight[i];
       viscous_result += results[1]*E1_weight[i];
+      bulkvis_result += results[2]*E1_weight[i];
    }
    
    results[0] = equilibrium_result;
    results[1] = viscous_result;
+   results[2] = bulkvis_result;
 
    delete[] E1_pt;
    delete[] E1_weight;
@@ -359,6 +377,7 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
 {
    double equilibrium_result = 0.0;
    double viscous_result = 0.0;
+   double bulkvis_result = 0.0;
    double E2_min;
    double E2_max;
    double min_1 = Eq*m[1]*m[1]/(t - m[1]*m[1]) + (t - m[1]*m[1])/4/Eq;
@@ -390,6 +409,7 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
       {
          results[0] = 0.0e0;
          results[1] = 0.0e0;
+         results[2] = 0.0e0;
          return (0.0);
       }
    
@@ -418,6 +438,7 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            bulkvis_result += common_factor*bulkvis_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
 
          for(int i=0; i<n_E2; i++)
@@ -434,6 +455,7 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            bulkvis_result += common_factor*bulkvis_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
       }
       else
@@ -452,6 +474,7 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            bulkvis_result += common_factor*bulkvis_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
          }
       }
 
@@ -462,14 +485,34 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
    {
       equilibrium_result = 0.0e0;
       viscous_result = 0.0e0;
+      bulkvis_result = 0.0e0;
    }
    results[0] = equilibrium_result;
    results[1] = viscous_result;
+   results[2] = bulkvis_result;
 
    return(0);
 }
 
 double HG_1to3_decay::viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3)
+{
+   double m1 = m[0];
+   double m2 = m[1];
+   double m3 = m[2];
+   double E3 = E1 - E2 - Eq;
+   double p1 = sqrt(E1*E1 - m1*m1);
+   double p2 = sqrt(E2*E2 - m2*m2);
+   double p3 = sqrt(E3*E3 - m3*m3);
+   double costheta1 = (- s - t + m2*m2 + m3*m3 + 2*E1*Eq)/(2*p1*Eq);
+   double costheta2 = ( - t + m2*m2 + 2*E2*Eq)/(2*p2*Eq);
+   double p3_z = p1*costheta1 - p2*costheta2 - Eq; 
+
+   double integrand = (1. + f0_E1)*deltaf_chi(p1/T)*0.5*(-1. + 3.*costheta1*costheta1) + f0_E2*deltaf_chi(p2/T)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3/T)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
+
+   return(integrand);
+}
+
+double HG_1to3_decay::bulkvis_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3)
 {
    double m1 = m[0];
    double m2 = m[1];
@@ -701,11 +744,11 @@ double HG_1to3_decay::RateintegrandE2(double E2, void *params)
  
     double result;
     if(rateType == 0)
-    {
        result = common_factor;
-    }
-    else
+    else if(rateType == 1)
        result = common_factor*viscous_integrand(s, t, E1, E2, Eq, Temp, f0_E1, f0_E2, f0_E3);
+    else
+       result = common_factor*bulkvis_integrand(s, t, E1, E2, Eq, Temp, f0_E1, f0_E2, f0_E3);
 
     return(result);
 }

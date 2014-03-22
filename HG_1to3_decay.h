@@ -22,7 +22,7 @@ class HG_1to3_decay
       double eps;
       int n_Eq, n_Temp;
       double *Eq_tb, *T_tb;
-      double **equilibrium_results, **viscous_results;
+      double **equilibrium_results, **viscous_results, **bulkvis_results;
 
       int channel;
       double *m, *mu;
@@ -52,6 +52,7 @@ class HG_1to3_decay
       double Integrate_E1(double Eq, double T, double s, double t, double* results);
       double Integrate_E2(double Eq, double T, double s, double t, double E1, double* results);
       double viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3);
+      double bulkvis_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3);
       double Bose_distribution(double E, double T, double mu);
       double deltaf_chi(double p);
       
