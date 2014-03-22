@@ -183,7 +183,7 @@ int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr
 
    // calculate form factor
    Calculate_Formfactor(Eq_tb, Formfactor_tb, n_Eq, channel);
-   // calculate chemical potenitals
+   // calculate chemical potentials
    chempotential_ptr->Calculate_mu(T_tb, mu1_tb, mu2_tb, mu3_tb, n_Temp, channel);
 
    double Eq;
@@ -328,7 +328,7 @@ void HG_1to3_decay::set_particleMass()
    }
    else
    {
-      cout << "Error:: set_particleMass: input channel is invalide, channel = " << channel << endl;
+      cout << "Error:: set_particleMass: input channel is invalid, channel = " << channel << endl;
       exit(1);
    }
    return;
@@ -421,6 +421,10 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
       double* E2_pt = new double [n_E2];
       double* E2_weight = new double [n_E2];
 
+      double* bulkvis_B0 = new double [3];
+      double* bulkvis_D0 = new double [3];
+      double* bulkvis_E0 = new double [3];
+
       if(channel == 3 || channel == 5)
       {
          double E2_cut = E2_min + (E2_max - E2_min)/100.;
@@ -438,7 +442,9 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
-            bulkvis_result += common_factor*bulkvis_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+
+            get_bulkvis_coefficients(T, bulkvis_B0, bulkvis_D0, bulkvis_E0);
+            bulkvis_result += common_factor*bulkvis_integrand(E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_B0, bulkvis_D0, bulkvis_E0)*E2_weight[i];
          }
 
          for(int i=0; i<n_E2; i++)
@@ -455,7 +461,8 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
-            bulkvis_result += common_factor*bulkvis_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            get_bulkvis_coefficients(T, bulkvis_B0, bulkvis_D0, bulkvis_E0);
+            bulkvis_result += common_factor*bulkvis_integrand(E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_B0, bulkvis_D0, bulkvis_E0)*E2_weight[i];
          }
       }
       else
@@ -474,12 +481,16 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             common_factor = f0_E1*(1 + f0_E2)*(1 + f0_E3)/(sqrt(a*E2_pt[i]*E2_pt[i] + 2*b*E2_pt[i] + c));
             equilibrium_result += common_factor*1.*E2_weight[i];
             viscous_result += common_factor*viscous_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
-            bulkvis_result += common_factor*bulkvis_integrand(s, t, E1, E2_pt[i], Eq, T, f0_E1, f0_E2, f0_E3)*E2_weight[i];
+            get_bulkvis_coefficients(T, bulkvis_B0, bulkvis_D0, bulkvis_E0);
+            bulkvis_result += common_factor*bulkvis_integrand(E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_B0, bulkvis_D0, bulkvis_E0)*E2_weight[i];
          }
       }
 
       delete[] E2_pt;
       delete[] E2_weight;
+      delete[] bulkvis_B0;
+      delete[] bulkvis_D0;
+      delete[] bulkvis_E0;
    }
    else  // no kinematic phase space
    {
@@ -512,20 +523,118 @@ double HG_1to3_decay::viscous_integrand(double s, double t, double E1, double E2
    return(integrand);
 }
 
-double HG_1to3_decay::bulkvis_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3)
+void HG_1to3_decay::get_bulkvis_coefficients(double T, double* bulkvis_B0, double* bulkvis_D0, double * bulkvis_E0)
 {
-   double m1 = m[0];
-   double m2 = m[1];
-   double m3 = m[2];
-   double E3 = E1 - E2 - Eq;
-   double p1 = sqrt(E1*E1 - m1*m1);
-   double p2 = sqrt(E2*E2 - m2*m2);
-   double p3 = sqrt(E3*E3 - m3*m3);
-   double costheta1 = (- s - t + m2*m2 + m3*m3 + 2*E1*Eq)/(2*p1*Eq);
-   double costheta2 = ( - t + m2*m2 + 2*E2*Eq)/(2*p2*Eq);
-   double p3_z = p1*costheta1 - p2*costheta2 - Eq; 
+   if(channel == 1)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 2)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 3)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 4)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 5)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 6)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 7)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else if(channel == 8)
+   {
+      bulkvis_B0[0] = 0.0;
+      bulkvis_D0[0] = 0.0;
+      bulkvis_E0[0] = 0.0;
+      bulkvis_B0[1] = 0.0;
+      bulkvis_D0[1] = 0.0;
+      bulkvis_E0[1] = 0.0;
+      bulkvis_B0[2] = 0.0;
+      bulkvis_D0[2] = 0.0;
+      bulkvis_E0[2] = 0.0;
+   }
+   else
+   {
+      cout << "Error:: get_bulkvis_coefficients: input channel is invalid, channel = " << channel << endl;
+      exit(1);
+   }
+   return;
+}
 
-   double integrand = (1. + f0_E1)*deltaf_chi(p1/T)*0.5*(-1. + 3.*costheta1*costheta1) + f0_E2*deltaf_chi(p2/T)*0.5*(-1. + 3.*costheta2*costheta2) + f0_E3*deltaf_chi(p3/T)/p3/p3*(-0.5*p3*p3 + 1.5*p3_z*p3_z);
+double HG_1to3_decay::bulkvis_integrand(double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double* bulkvis_B0, double* bulkvis_D0, double* bulkvis_E0)
+{
+   double E3 = E1 + E2 - Eq;
+   double integrand = (1. + f0_E1)*(bulkvis_B0[0] + E1*bulkvis_D0[0] + E1*E1*bulkvis_E0[0])
+                      + f0_E2*(bulkvis_B0[1] + E2*bulkvis_D0[1] + E2*E2*bulkvis_E0[1])
+                      + f0_E3*(bulkvis_B0[2] + E3*bulkvis_D0[2] + E3*E3*bulkvis_E0[2]);
 
    return(integrand);
 }
@@ -748,7 +857,16 @@ double HG_1to3_decay::RateintegrandE2(double E2, void *params)
     else if(rateType == 1)
        result = common_factor*viscous_integrand(s, t, E1, E2, Eq, Temp, f0_E1, f0_E2, f0_E3);
     else
-       result = common_factor*bulkvis_integrand(s, t, E1, E2, Eq, Temp, f0_E1, f0_E2, f0_E3);
+    {
+       double* bulkvis_B0 = new double [3];
+       double* bulkvis_D0 = new double [3];
+       double* bulkvis_E0 = new double [3];
+       get_bulkvis_coefficients(Temp, bulkvis_B0, bulkvis_D0, bulkvis_E0);
+       result = common_factor*bulkvis_integrand(E1, E2, Eq, f0_E1, f0_E2, f0_E3, bulkvis_B0, bulkvis_D0, bulkvis_E0);
+       delete[] bulkvis_B0;
+       delete[] bulkvis_D0;
+       delete[] bulkvis_E0;
+    }
 
     return(result);
 }
