@@ -525,106 +525,16 @@ double HG_1to3_decay::viscous_integrand(double s, double t, double E1, double E2
 
 void HG_1to3_decay::get_bulkvis_coefficients(double T, double* bulkvis_B0, double* bulkvis_D0, double * bulkvis_E0)
 {
-   if(channel == 1)
+   double T_fm = T/hbarC;  // convert to [1/fm]
+   double mass_fm[3];
+   for(int i = 0; i < 3; i++)
+      mass_fm[i] = m[i]/hbarC;  // convert to [1/fm]
+
+   for(int i = 0; i < 3; i++)
    {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 2)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 3)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 4)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 5)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 6)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 7)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else if(channel == 8)
-   {
-      bulkvis_B0[0] = 0.0;
-      bulkvis_D0[0] = 0.0;
-      bulkvis_E0[0] = 0.0;
-      bulkvis_B0[1] = 0.0;
-      bulkvis_D0[1] = 0.0;
-      bulkvis_E0[1] = 0.0;
-      bulkvis_B0[2] = 0.0;
-      bulkvis_D0[2] = 0.0;
-      bulkvis_E0[2] = 0.0;
-   }
-   else
-   {
-      cout << "Error:: get_bulkvis_coefficients: input channel is invalid, channel = " << channel << endl;
-      exit(1);
+      bulkvis_B0[i] = exp(-15.04512474*T_fm + 11.76194266)*(mass_fm[i]*mass_fm[i])/hbarC; // convert to [fm^3/GeV]
+      bulkvis_D0[i] = exp( -12.45699277*T_fm + 11.4949293)/hbarC/hbarC;  // convert to [fm^3/GeV^2]
+      bulkvis_E0[i] = -exp(-14.45087586*T_fm + 11.62716548)/hbarC/hbarC/hbarC; // convert to [fm^3/GeV^3]
    }
    return;
 }
