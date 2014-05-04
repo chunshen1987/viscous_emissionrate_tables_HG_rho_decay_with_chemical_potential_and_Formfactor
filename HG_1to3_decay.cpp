@@ -85,6 +85,7 @@ HG_1to3_decay::HG_1to3_decay(ParameterReader* paraRdr_in)
    mu = new double [3];
    deltaf_alpha = paraRdr->getVal("deltaf_alpha");
 
+   bulkdf_coeff = new Table ("chemical_potential_tb/s95p/s95p-PCE165-v0/BulkDf_Coefficients_Hadrons_CE.dat");
 }
 
 HG_1to3_decay::~HG_1to3_decay()
@@ -130,6 +131,8 @@ HG_1to3_decay::~HG_1to3_decay()
    delete[] E2_weight_standard;
    delete[] m;
    delete[] mu;
+
+   delete bulkdf_coeff;
 
 }
 
@@ -526,15 +529,17 @@ double HG_1to3_decay::viscous_integrand(double s, double t, double E1, double E2
 void HG_1to3_decay::get_bulkvis_coefficients(double T, double* bulkvis_B0, double* bulkvis_D0, double * bulkvis_E0)
 {
    double T_fm = T/hbarC;  // convert to [1/fm]
-   double mass_fm[3];
-   for(int i = 0; i < 3; i++)
-      mass_fm[i] = m[i]/hbarC;  // convert to [1/fm]
 
    for(int i = 0; i < 3; i++)
    {
-      bulkvis_B0[i] = exp(-15.04512474*T_fm + 11.76194266)*(mass_fm[i]*mass_fm[i])/hbarC; // convert to [fm^3/GeV]
-      bulkvis_D0[i] = exp( -12.45699277*T_fm + 11.4949293)/hbarC/hbarC;  // convert to [fm^3/GeV^2]
-      bulkvis_E0[i] = -exp(-14.45087586*T_fm + 11.62716548)/hbarC/hbarC/hbarC; // convert to [fm^3/GeV^3]
+      bulkvis_B0[i] = bulkdf_coeff->interp(1, 2, T_fm, 5)/pow(hbarC, 3);  // [fm^3/GeV^3]
+      bulkvis_D0[i] = bulkdf_coeff->interp(1, 3, T_fm, 5)/pow(hbarC, 2);  // [fm^3/GeV^2]
+      bulkvis_E0[i] = bulkdf_coeff->interp(1, 4, T_fm, 5)/pow(hbarC, 3);  // [fm^3/GeV^3]
+
+      // parameterization for mu = 0
+      //bulkvis_B0[i] = exp(-15.04512474*T_fm + 11.76194266)/pow(hbarC, 3);   // convert to [fm^3/GeV^3]
+      //bulkvis_D0[i] = exp( -12.45699277*T_fm + 11.4949293)/pow(hbarC, 2);   // convert to [fm^3/GeV^2]
+      //bulkvis_E0[i] = -exp(-14.45087586*T_fm + 11.62716548)/pow(hbarC, 3);  // convert to [fm^3/GeV^3]
    }
    return;
 }
@@ -542,9 +547,9 @@ void HG_1to3_decay::get_bulkvis_coefficients(double T, double* bulkvis_B0, doubl
 double HG_1to3_decay::bulkvis_integrand(double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double* bulkvis_B0, double* bulkvis_D0, double* bulkvis_E0)
 {
    double E3 = E1 + E2 - Eq;
-   double integrand = (1. + f0_E1)*(bulkvis_B0[0] + E1*bulkvis_D0[0] + E1*E1*bulkvis_E0[0])
-                      + f0_E2*(bulkvis_B0[1] + E2*bulkvis_D0[1] + E2*E2*bulkvis_E0[1])
-                      + f0_E3*(bulkvis_B0[2] + E3*bulkvis_D0[2] + E3*E3*bulkvis_E0[2]);
+   double integrand = (1. + f0_E1)*(-bulkvis_B0[0]*m[0]*m[0] - E1*bulkvis_D0[0] - E1*E1*bulkvis_E0[0])
+                      + (1. + f0_E2)*(-bulkvis_B0[1]*m[1]*m[1] - E2*bulkvis_D0[1] - E2*E2*bulkvis_E0[1])
+                      + f0_E3*(-bulkvis_B0[2]*m[2]*m[2] - E3*bulkvis_D0[2] - E3*E3*bulkvis_E0[2]);
 
    return(integrand);
 }

@@ -2,6 +2,7 @@
 #define HG_1to3_decay_H
 
 #include <string>
+#include "Table.h"
 #include "ParameterReader.h"
 #include "Physicalconstants.h"
 #include "chemical_potential.h"
@@ -40,6 +41,9 @@ class HG_1to3_decay
       double **E2_pt_standard, **E2_weight_standard;
 
       double deltaf_alpha;
+      
+      //table for bulk delta f coefficients
+      Table *bulkdf_coeff;
 
    public:
       HG_1to3_decay(ParameterReader* paraRdr_in);
