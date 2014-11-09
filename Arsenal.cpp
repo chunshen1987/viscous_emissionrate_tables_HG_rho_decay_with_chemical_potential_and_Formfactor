@@ -175,154 +175,175 @@ vector<double> stringToDoubles(string str)
 
 
 //**********************************************************************
-double interpCubicDirect(vector<double>* x, vector<double>* y, double x0)
+double interpCubicDirect(std::vector< double >* x, std::vector< double >* y, double xx, bool allowExtrapolation)
 // Returns the interpreted value of y=y(x) at x=x0 using cubic polynomial interpolation method.
-// -- x,y: the independent and dependent double x0ables; x is assumed to be equal spaced and increasing
+// -- x,y: the independent and dependent double varables; x is assumed to be equal spaced and increasing
 // -- x0: where the interpolation should be performed
 {
-  long size = x->size();
-  if (size==1) {cout<<"interpCubicDirect warning: table size = 1"; return (*y)[0];}
-  double dx = (*x)[1]-(*x)[0]; // increment in x
+    long size = x->size();
+    if (size==1) {cout<<"interpCubicDirect warning: table size = 1"; return (*y)[0];}
+    double dx = (*x)[1]-(*x)[0]; // increment in x
 
-  // if close to left end:
-  if (abs(x0-(*x)[0])<dx*1e-30) return (*y)[0];
+    // if close to left end:
+    if (abs(xx-(*x)[0])<dx*1e-30) return (*y)[0];
 
-  // find x's integer index
-  long idx = floor((x0-(*x)[0])/dx);
+    // find x's integer index
+    long idx = floor((xx-(*x)[0])/dx);
 
-  if (idx<0 || idx>=size-1)
-  {
-    cout    << "interpCubicDirect: x0 out of bounds." << endl
-            << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-            << "x0=" << x0 << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
-    exit(1);
-  }
+    if (!allowExtrapolation)
+    {
+        if (idx<0 || idx>=size-1)
+        {
+            cout    << "interpCubicDirect: x0 out of bounds." << endl
+                    << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
+                    << "xx=" << xx << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
+            exit(1);
+        }
+        if (idx==0)
+        {
+            // use quadratic interpolation at left end
+            double A0 = (*y)[0], A1 = (*y)[1], A2 = (*y)[2], deltaX = xx - (*x)[0]; // deltaX is the increment of x0 compared to the closest lattice point
+            return (A0-2.0*A1+A2)/(2.0*dx*dx)*deltaX*deltaX - (3.0*A0-4.0*A1+A2)/(2.0*dx)*deltaX + A0;
+        }
+        else if (idx==size-2)
+        {
+            // use quadratic interpolation at right end
+            double A0 = (*y)[size-3], A1 = (*y)[size-2], A2 = (*y)[size-1], deltaX = xx - ((*x)[0] + (idx-1)*dx);
+            return (A0-2.0*A1+A2)/(2.0*dx*dx)*deltaX*deltaX - (3.0*A0-4.0*A1+A2)/(2.0*dx)*deltaX + A0;
+        }
+    }
+    else
+    {
+        if (idx<0) idx=1; // first 4 elements
+        if (idx>=size-1) idx=size-3; // last 4 elements
+    }
 
-  if (idx==0)
-  {
-    // use quadratic interpolation at left end
-    double A0 = (*y)[0], A1 = (*y)[1], A2 = (*y)[2], deltaX = x0 - (*x)[0]; // deltaX is the increment of x0 compared to the closest lattice point
-    return (A0-2.0*A1+A2)/(2.0*dx*dx)*deltaX*deltaX - (3.0*A0-4.0*A1+A2)/(2.0*dx)*deltaX + A0;
-  }
-  else if (idx==size-2)
-  {
-    // use quadratic interpolation at right end
-    double A0 = (*y)[size-3], A1 = (*y)[size-2], A2 = (*y)[size-1], deltaX = x0 - ((*x)[0] + (idx-1)*dx);
-    return (A0-2.0*A1+A2)/(2.0*dx*dx)*deltaX*deltaX - (3.0*A0-4.0*A1+A2)/(2.0*dx)*deltaX + A0;
-  }
-  else
-  {
     // use cubic interpolation
-    double A0 = (*y)[idx-1], A1 = (*y)[idx], A2 = (*y)[idx+1], A3 = (*y)[idx+2], deltaX = x0 - ((*x)[0] + idx*dx);
+    double A0 = (*y)[idx-1], A1 = (*y)[idx], A2 = (*y)[idx+1], A3 = (*y)[idx+2], deltaX = xx - ((*x)[0] + idx*dx);
     //cout << A0 << "  " << A1 << "  " << A2 << "  " << A3 << endl;
     return (-A0+3.0*A1-3.0*A2+A3)/(6.0*dx*dx*dx)*deltaX*deltaX*deltaX
             + (A0-2.0*A1+A2)/(2.0*dx*dx)*deltaX*deltaX
             - (2.0*A0+3.0*A1-6.0*A2+A3)/(6.0*dx)*deltaX
             + A1;
-  }
+
 
 }
 
-
-
-
 //**********************************************************************
-double interpLinearDirect(vector<double>* x, vector<double>* y, double x0)
+double interpLinearDirect(std::vector< double >* x, std::vector< double >* y, double xx, bool allowExtrapolation)
 // Returns the interpreted value of y=y(x) at x=x0 using linear interpolation method.
 // -- x,y: the independent and dependent double x0ables; x is assumed to be equal spaced and increasing
 // -- x0: where the interpolation should be performed
 {
-  long size = x->size();
-  if (size==1) {cout<<"interpLinearDirect warning: table size = 1"<<endl; return (*y)[0];}
-  double dx = (*x)[1]-(*x)[0]; // increment in x
+    long size = x->size();
+    if (size==1) {cout<<"interpLinearDirect warning: table size = 1"<<endl; return (*y)[0];}
+    double dx = (*x)[1]-(*x)[0]; // increment in x
 
-  // if close to left end:
-  if (abs(x0-(*x)[0])<dx*1e-30) return (*y)[0];
+    // if close to left end:
+    if (abs(xx-(*x)[0])<dx*1e-30) return (*y)[0];
 
-  // find x's integer index
-  long idx = floor((x0-(*x)[0])/dx);
+    // find x's integer index
+    long idx = floor((xx-(*x)[0])/dx);
 
-  if (idx<0 || idx>=size-1)
-  {
-    cout    << "interpLinearDirect: x0 out of bounds." << endl
-            << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-            << "x0=" << x0 << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
-    exit(1);
-  }
+    if (!allowExtrapolation)
+    {
+        if (idx<0 || idx>=size-1)
+        {
+            cout    << "interpLinearDirect: x0 out of bounds." << endl
+                    << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
+                    << "xx=" << xx << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
+            exit(1);
+        }
+    }
+    else
+    {
+        if (idx<0) idx=0;
+        if (idx>=size-1) idx=size-2;
+    }
 
-  return (*y)[idx] + ((*y)[idx+1]-(*y)[idx])/dx*(x0-(*x)[idx]);
+    return (*y)[idx] + ((*y)[idx+1]-(*y)[idx])/dx*(xx-(*x)[idx]);
 
 }
 
-
-
-
 //**********************************************************************
-double interpNearestDirect(vector<double>* x, vector<double>* y, double x0)
+double interpNearestDirect(std::vector< double >* x, std::vector< double >* y, double xx, bool allowExtrapolation)
 // Returns the interpreted value of y=y(x) at x=x0 using nearest interpolation method.
 // -- x,y: the independent and dependent double x0ables; x is assumed to be equal spaced and increasing
 // -- x0: where the interpolation should be performed
 {
-  long size = x->size();
-  if (size==1) {cout<<"interpNearestDirect warning: table size = 1"<<endl; return (*y)[0];}
-  double dx = (*x)[1]-(*x)[0]; // increment in x
+    long size = x->size();
+    if (size==1) {cout<<"interpNearestDirect warning: table size = 1"<<endl; return (*y)[0];}
+    double dx = (*x)[1]-(*x)[0]; // increment in x
 
-  // if close to left end:
-  if (abs(x0-(*x)[0])<dx*1e-30) return (*y)[0];
+    // if close to left end:
+    if (abs(xx-(*x)[0])<dx*1e-30) return (*y)[0];
 
-  // find x's integer index
-  long idx = floor((x0-(*x)[0])/dx);
+    // find x's integer index
+    long idx = floor((xx-(*x)[0])/dx);
 
-  if (idx<0 || idx>=size-1)
-  {
-    cout    << "interpNearestDirect: x0 out of bounds." << endl
-            << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-            << "x0=" << x0 << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
-    exit(1);
-  }
+    if (!allowExtrapolation)
+    {
+        if (idx<0 || idx>=size-1)
+        {
+        cout    << "interpNearestDirect: x0 out of bounds." << endl
+                << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
+                << "xx=" << xx << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
+        exit(1);
+        }
+    }
+    else
+    {
+        if (idx<0) idx=0;
+        if (idx>=size-1) idx=size-2;
+    }
 
-  return x0-(*x)[idx]>dx/2 ? (*y)[idx+1] : (*y)[idx];
+    return xx-(*x)[idx]>dx/2 ? (*y)[idx+1] : (*y)[idx];
 
 }
 
-
-
-
 //**********************************************************************
-double interpCubicMono(vector<double>* x, vector<double>* y, double xx)
+double interpCubicMono(std::vector< double >* x, std::vector< double >* y, double xx, bool allowExtrapolation)
+// Note that this function does NOT perform well with small x and y table spacing; in which case use "direct" version instead.
 // Returns the interpreted value of y=y(x) at x=x0 using cubic polynomial interpolation method.
 // -- x,y: the independent and dependent double x0ables; x is *NOT* assumed to be equal spaced but it has to be increasing
 // -- xx: where the interpolation should be performed
 {
-  long size = x->size();
-  if (size==1) {cout<<"interpCubicMono warning: table size = 1"<<endl; return (*y)[0];}
+    long size = x->size();
+    if (size==1) {cout<<"interpCubicMono warning: table size = 1"<<endl; return (*y)[0];}
 
-  // if close to left end:
-  if (abs(xx-(*x)[0])<((*x)[1]-(*x)[0])*1e-30) return (*y)[0];
+    // if close to left end:
+    if (abs(xx-(*x)[0])<((*x)[1]-(*x)[0])*1e-30) return (*y)[0];
 
-  // find x's integer index
-  long idx = binarySearch(x, xx);
+    // find x's integer index
+    long idx = binarySearch(x, xx, true);
 
-  if (idx<0 || idx>=size-1)
-  {
-    cout    << "interpCubicMono: x0 out of bounds." << endl
-            << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-            << "xx=" << xx << ", " << "idx=" << idx << endl;
-    exit(1);
-  }
+    if (!allowExtrapolation)
+    {
+        if (idx<0 || idx>=size-1)
+        {
+            cout    << "interpCubicMono: x0 out of bounds." << endl
+                    << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
+                    << "xx=" << xx << ", " << "idx=" << idx << endl;
+            exit(1);
+        }
+        
+        if (idx==0)
+        {
+            // use linear interpolation at the left end
+            return (*y)[0] + ( (*y)[1]-(*y)[0] )/( (*x)[1]-(*x)[0] )*( xx-(*x)[0] );
+        }
+        else if (idx==size-2)
+        {
+            // use linear interpolation at the right end
+            return (*y)[size-2] + ( (*y)[size-1]-(*y)[size-2] )/( (*x)[size-1]-(*x)[size-2] )*( xx-(*x)[size-2] );
+        }
+    }
+    else
+    {
+        if (idx<0) idx=1; // first 4 elements
+        if (idx>=size-1) idx=size-3; // last 4 elements
+    }
 
-  if (idx==0)
-  {
-    // use linear interpolation at the left end
-    return (*y)[0] + ( (*y)[1]-(*y)[0] )/( (*x)[1]-(*x)[0] )*( xx-(*x)[0] );
-  }
-  else if (idx==size-2)
-  {
-    // use linear interpolation at the right end
-    return (*y)[size-2] + ( (*y)[size-1]-(*y)[size-2] )/( (*x)[size-1]-(*x)[size-2] )*( xx-(*x)[size-2] );
-  }
-  else
-  {
     // use cubic interpolation
     long double y0 = (*y)[idx-1], y1 = (*y)[idx], y2 = (*y)[idx+1], y3 = (*y)[idx+2];
     long double y01=y0-y1, y02=y0-y2, y03=y0-y3, y12=y1-y2, y13=y1-y3, y23=y2-y3;
@@ -332,28 +353,28 @@ double interpCubicMono(vector<double>* x, vector<double>* y, double xx)
     long double denominator = x01*x02*x12*x03*x13*x23;
     long double C0, C1, C2, C3;
     C0 = (x0*x02*x2*x03*x23*x3*y1
-          + x1*x1s*(x0*x03*x3*y2+x2s*(-x3*y0+x0*y3)+x2*(x3s*y0-x0s*y3))
-          + x1*(x0s*x03*x3s*y2+x2*x2s*(-x3s*y0+x0s*y3)+x2s*(x3*x3s*y0-x0*x0s*y3))
-          + x1s*(x0*x3*(-x0s+x3s)*y2+x2*x2s*(x3*y0-x0*y3)+x2*(-x3*x3s*y0+x0*x0s*y3))
-          )/denominator;
+        + x1*x1s*(x0*x03*x3*y2+x2s*(-x3*y0+x0*y3)+x2*(x3s*y0-x0s*y3))
+        + x1*(x0s*x03*x3s*y2+x2*x2s*(-x3s*y0+x0s*y3)+x2s*(x3*x3s*y0-x0*x0s*y3))
+        + x1s*(x0*x3*(-x0s+x3s)*y2+x2*x2s*(x3*y0-x0*y3)+x2*(-x3*x3s*y0+x0*x0s*y3))
+        )/denominator;
     C1 = (x0s*x03*x3s*y12
-          + x2*x2s*(x3s*y01+x0s*y13)
-          + x1s*(x3*x3s*y02+x0*x0s*y23-x2*x2s*y03)
-          + x2s*(-x3*x3s*y01-x0*x0s*y13)
-          + x1*x1s*(-x3s*y02+x2s*y03-x0s*y23)
-          )/denominator;
+        + x2*x2s*(x3s*y01+x0s*y13)
+        + x1s*(x3*x3s*y02+x0*x0s*y23-x2*x2s*y03)
+        + x2s*(-x3*x3s*y01-x0*x0s*y13)
+        + x1*x1s*(-x3s*y02+x2s*y03-x0s*y23)
+        )/denominator;
     C2 = (-x0*x3*(x0s-x3s)*y12
-          + x2*(x3*x3s*y01+x0*x0s*y13)
-          + x1*x1s*(x3*y02+x0*y23-x2*y03)
-          + x2*x2s*(-x3*y01-x0*y13)
-          + x1*(-x3*x3s*y02+x2*x2s*y03-x0*x0s*y23)
-          )/denominator;
+        + x2*(x3*x3s*y01+x0*x0s*y13)
+        + x1*x1s*(x3*y02+x0*y23-x2*y03)
+        + x2*x2s*(-x3*y01-x0*y13)
+        + x1*(-x3*x3s*y02+x2*x2s*y03-x0*x0s*y23)
+        )/denominator;
     C3 = (x0*x03*x3*y12
-          + x2s*(x3*y01+x0*y13)
-          + x1*(x3s*y02+x0s*y23-x2s*y03)
-          + x2*(-x3s*y01-x0s*y13)
-          + x1s*(-x3*y02+x2*y03-x0*y23)
-          )/denominator;
+        + x2s*(x3*y01+x0*y13)
+        + x1*(x3s*y02+x0s*y23-x2s*y03)
+        + x2*(-x3s*y01-x0s*y13)
+        + x1s*(-x3*y02+x2*y03-x0*y23)
+        )/denominator;
 /*    cout  << x0s*x03*x3s*y12 << "  "
           <<  x2*x2s*(x3s*y01+x0s*y13) << "   "
           <<  x1s*(x3*x3s*y02+x0*x0s*y23-x2*x2s*y03) << "  "
@@ -365,71 +386,78 @@ double interpCubicMono(vector<double>* x, vector<double>* y, double xx)
     cout << y0 << " " << y1 << "  " << y2 << "  " << y3 << endl;
     cout << C0 << "  " << C1 << "  " << C2 << "  " << C3 << endl;*/
     return C0 + C1*xx + C2*xx*xx + C3*xx*xx*xx;
-  }
 
 }
 
-
-
-
 //**********************************************************************
-double interpLinearMono(vector<double>* x, vector<double>* y, double xx)
+double interpLinearMono(std::vector< double >* x, std::vector< double >* y, double xx, bool allowExtrapolation)
 // Returns the interpreted value of y=y(x) at x=x0 using linear interpolation method.
 // -- x,y: the independent and dependent double x0ables; x is *NOT* assumed to be equal spaced but it has to be increasing
 // -- xx: where the interpolation should be performed
 {
-  long size = x->size();
-  if (size==1) {cout<<"interpLinearMono warning: table size = 1"<<endl; return (*y)[0];}
+    long size = x->size();
+    if (size==1) {cout<<"interpLinearMono warning: table size = 1"<<endl; return (*y)[0];}
 
-  // if close to left end:
-  if (abs(xx-(*x)[0])<((*x)[1]-(*x)[0])*1e-30) return (*y)[0];
+    // if close to left end:
+    if (abs(xx-(*x)[0])<((*x)[1]-(*x)[0])*1e-30) return (*y)[0];
 
-  // find x's integer index
-  long idx = binarySearch(x, xx);
+    // find x's integer index
+    long idx = binarySearch(x, xx, true);
 
-  if (idx<0 || idx>=size-1)
-  {
-    cout    << "interpLinearMono: x0 out of bounds." << endl
-            << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-            << "xx=" << xx << ", " << "idx=" << idx << endl;
-    exit(1);
-  }
+    if (!allowExtrapolation)
+    {
+        if (idx<0 || idx>=size-1)
+        {
+            cout    << "interpLinearMono: x0 out of bounds." << endl
+                    << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
+                    << "xx=" << xx << ", " << "idx=" << idx << endl;
+            exit(1);
+        }
+    }
+    else
+    {
+        if (idx<0) idx=0;
+        if (idx>=size-1) idx=size-2;
+    }
 
-  return (*y)[idx] + ( (*y)[idx+1]-(*y)[idx] )/( (*x)[idx+1]-(*x)[idx] )*( xx-(*x)[idx] );
+    return (*y)[idx] + ( (*y)[idx+1]-(*y)[idx] )/( (*x)[idx+1]-(*x)[idx] )*( xx-(*x)[idx] );
 
 }
 
-
-
-
 //**********************************************************************
-double interpNearestMono(vector<double>* x, vector<double>* y, double xx)
+double interpNearestMono(std::vector< double >* x, std::vector< double >* y, double xx, bool allowExtrapolation)
 // Returns the interpreted value of y=y(x) at x=x0 using nearest interpolation method.
 // -- x,y: the independent and dependent double x0ables; x is *NOT* assumed to be equal spaced but it has to be increasing
 // -- xx: where the interpolation should be performed
 {
-  long size = x->size();
-  if (size==1) {cout<<"interpNearestMono warning: table size = 1"<<endl; return (*y)[0];}
+    long size = x->size();
+    if (size==1) {cout<<"interpNearestMono warning: table size = 1"<<endl; return (*y)[0];}
 
-  // if close to left end:
-  if (abs(xx-(*x)[0])<((*x)[1]-(*x)[0])*1e-30) return (*y)[0];
+    // if close to left end:
+    if (abs(xx-(*x)[0])<((*x)[1]-(*x)[0])*1e-30) return (*y)[0];
 
-  // find x's integer index
-  long idx = binarySearch(x, xx);
+    // find x's integer index
+    long idx = binarySearch(x, xx, true);
 
-  if (idx<0 || idx>=size-1)
-  {
-    cout    << "interpNearestMono: x0 out of bounds." << endl
-            << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-            << "xx=" << xx << ", " << "idx=" << idx << endl;
-    exit(1);
-  }
+    if (!allowExtrapolation)
+    {
+        if (idx<0 || idx>=size-1)
+        {
+            cout    << "interpNearestMono: x0 out of bounds." << endl
+                    << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
+                    << "xx=" << xx << ", " << "idx=" << idx << endl;
+            exit(1);
+        }
+    }
+    else
+    {
+        if (idx<0) idx=0;
+        if (idx>=size-1) idx=size-2;
+    }
 
-  return xx-(*x)[idx] > (*x)[idx+1]-xx ? (*y)[idx+1] : (*y)[idx];
+    return xx-(*x)[idx] > (*x)[idx+1]-xx ? (*y)[idx+1] : (*y)[idx];
 
 }
-
-
 
 
 //**********************************************************************
@@ -517,9 +545,13 @@ double invertTableDirect(vector<double>* x, vector<double>* y, double y0, double
 }
 
 //**********************************************************************
-long binarySearch(vector<double>* A, double value)
-// Return the index of the largest number less than value in the list A
-// using binary search.
+long binarySearch(vector<double>* A, double value, bool skip_out_of_range)
+// Return the index of the largest index than at which the value in the list
+// A is smaller than the specified "value using binary search.
+// Index starts with 0.
+// If skip_out_of_range is set to true, then it will return -1 for those
+// samples that are out of the lower table range, and length-1 if out of
+// the upper table range.
 {
    int length = A->size();
    int idx_i, idx_f, idx;
@@ -527,13 +559,15 @@ long binarySearch(vector<double>* A, double value)
    idx_f = length-1;
    if(value > (*A)[idx_f])
    {
-      cout << "binarySearch: desired value is too large,  exceed the end of the table." << endl;
-      exit(1);
+      if (skip_out_of_range) return length-1; // normal return value is between 0 and length-2
+      cout << "binarySearch: desired value is too large, exceeding the end of the table." << endl;
+      exit(-1);
    }
    if(value < (*A)[idx_i])
    {
-      cout << "binarySearch: desired value is too small, exceed the begin of table." << endl;
-      exit(1);
+      if (skip_out_of_range) return -1; // normal return value is between 0 and length-2
+      cout << "binarySearch: desired value is too small, exceeding the beginning of table." << endl;
+      exit(-1);
    }
    idx = (int) floor((idx_f+idx_i)/2.);
    while((idx_f-idx_i) > 1)
@@ -546,6 +580,7 @@ long binarySearch(vector<double>* A, double value)
    }
    return(idx_i);
 }
+
 
 void outputFunctionerror(string function_name, string massage, double value, int level)
 {
