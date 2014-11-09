@@ -41,6 +41,7 @@ class HG_1to3_decay
       double **E2_pt_standard, **E2_weight_standard;
 
       double deltaf_alpha;
+      int bulk_deltaf_kind;
       
       //table for bulk delta f coefficients
       Table *bulkdf_coeff;
@@ -56,8 +57,10 @@ class HG_1to3_decay
       double Integrate_E1(double Eq, double T, double s, double t, double* results);
       double Integrate_E2(double Eq, double T, double s, double t, double E1, double* results);
       double viscous_integrand(double s, double t, double E1, double E2, double Eq, double T, double f0_E1, double f0_E2, double f0_E3);
-      void get_bulkvis_coefficients(double T, double* bulkvis_B0, double* bulkvis_D0, double * bulkvis_E0);
-      double bulkvis_integrand(double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double* bulkvis_B0, double* bulkvis_D0, double* bulkvis_E0);
+      void get_bulkvis_coefficients_14moment(double T, double* bulkvis_B0, double* bulkvis_D0, double * bulkvis_E0);
+      void get_bulkvis_coefficients_relaxation(double T, double* bulkvis_Cbulk, double* bulkvis_e2);
+      double bulkvis_integrand_14moment(double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double* bulkvis_B0, double* bulkvis_D0, double* bulkvis_E0);
+      double bulkvis_integrand_relaxation(double T, double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double bulkvis_Cbulk, double bulkvis_e2);
       double Bose_distribution(double E, double T, double mu);
       double deltaf_chi(double p);
       
