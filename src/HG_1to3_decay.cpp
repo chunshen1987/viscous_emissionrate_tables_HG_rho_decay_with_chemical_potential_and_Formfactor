@@ -167,12 +167,20 @@ void HG_1to3_decay::output_emissionrateTable()
    }
 }
 
-int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel_in, string filename_in)
+string HG_1to3_decay::get_filename(int channel_id)
+{
+   string file_name;
+   if(channel_id == 8)
+      file_name = "rho_to_pion_pion_gamma";
+   return(file_name);
+}
+
+int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel_in)
 {
    double* results = new double [3];
 
-   filename = filename_in; 
    channel = channel_in;
+   filename = get_filename(channel); 
 
    set_particleMass();
    set_gausspoints();

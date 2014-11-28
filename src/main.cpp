@@ -20,27 +20,19 @@ int main(int argc, char** argv)
 {
    Stopwatch sw; 
    sw.tic();
-
-   Chemical_potential* chempotential_ptr;
-   Chemical_potential chemicalpotenital;
-   chempotential_ptr = &chemicalpotenital;
-   chempotential_ptr->readin_chempotential_table("chemical_potential_tb/s95p/s95p-PCE165-v0/s95p-v0-PCE165_chemvsT.dat");
-   chempotential_ptr->Set_chemical_potential_s95pv0PCE();
-
-   int channel = 0;
-   double m[3];
-   string filename;
    
    ParameterReader* paraRdr = new ParameterReader();
    paraRdr->readFromFile("parameters.dat");
    paraRdr->readFromArguments(argc, argv);
 
-   HG_1to3_decay HG1to3Rates(paraRdr);
+   int EOS_PCE_kind = paraRdr->getVal("EOS_PCE_kind");
 
-   //C.3
-   filename = "rho_to_pion_pion_gamma";
-   channel = 8;
-   HG1to3Rates.Calculate_emissionrates(chempotential_ptr, channel, filename);
+   Chemical_potential* chempotential_ptr = new Chemical_potential(EOS_PCE_kind);
+
+   HG_1to3_decay HG1to3Rates(paraRdr);
+   
+   int channel = paraRdr->getVal("channel");
+   HG1to3Rates.Calculate_emissionrates(chempotential_ptr, channel);
 
    sw.toc();
    cout << "totally takes : " << sw.takeTime() << "sec." << endl;

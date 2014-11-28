@@ -1,20 +1,37 @@
 # parameters for non-thermal equilibrium delta f correction
-deltaf_alpha = 2       #the exponent of the p dependence of the delta f correction deltaf_alpha = 2 for quadratic dependence
+deltaf_alpha = 2   #the exponent of the p dependence of the delta f correction deltaf_alpha = 2 for democratic choice
 bulk_deltaf_kind = 1   # bulk viscous delta f form
                        # 0: from 14 moments expansion
                        # 1: from relaxation time approximation
 
+channel = 8            # specify the channel id to calculate
+                       # 0: all the 7 channels
+                       # 1: pion + rho -> pion + gamma
+                       # 2: pion + rho -> omega -> pion + gamma
+                       # 3: pion + pion -> rho + gamma
+                       # 4: pion + Kstar -> K + gamma
+                       # 5: pion + K -> Kstar + gamma
+                       # 6: rho + K -> K + gamma
+                       # 7: K + Kstar -> pion + gamma
+                       # 8: rho -> pion + pion + gamma
+EOS_PCE_kind = 0       # kind of partial chemical equilibrium included 
+                       # in the calculation for the rates
+                       # 0: chemical equilibrium
+                       # 1: chemical freeze-out at T = 165 MeV
+                       # 2: chemical freeze-out at T = 150 MeV
+
 # parameters for numerical integrations
-n_s = 20
+n_s = 100
+s_max = 50.0
 n_t = 20
 
 n_E1 = 20
 n_E2 = 20
 
 # parameters for output photon emission rate table
-n_Eq = 81
+n_Eq = 1
 Eq_min = 0.05
 dEq = 0.05
-n_Temp = 76
+n_Temp = 1
 T_min = 0.1
 dT = 0.002

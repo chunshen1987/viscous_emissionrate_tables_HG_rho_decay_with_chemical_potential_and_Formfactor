@@ -11,9 +11,16 @@
 #include "chemical_potential.h"
 using namespace std;
 
-Chemical_potential::Chemical_potential()
+Chemical_potential::Chemical_potential(int EOS_PCE_kind_in)
 {
-   return;
+   EOS_PCE_kind = EOS_PCE_kind_in;
+   if(EOS_PCE_kind == 0)
+       readin_chempotential_table("chemical_potential_tb/s95p/s95p-v1/s95p-v1-CE_chemvsT.dat");
+   else if(EOS_PCE_kind == 1)
+       readin_chempotential_table("chemical_potential_tb/s95p/s95p-PCE165-v0/s95p-v0-PCE165_chemvsT.dat");
+   else if(EOS_PCE_kind == 2)
+       readin_chempotential_table("chemical_potential_tb/s95p/s95p-PCE-v1/s95p-v1-PCE150_chemvsT.dat");
+   Set_chemical_potential();
 }
 
 Chemical_potential::~Chemical_potential()
@@ -22,7 +29,6 @@ Chemical_potential::~Chemical_potential()
    delete[] mu_pion;
    delete[] mu_K;
    delete EOS_Mu_Table_ptr;
-   return;
 }
 
 void Chemical_potential::readin_chempotential_table(string filename)
@@ -30,11 +36,10 @@ void Chemical_potential::readin_chempotential_table(string filename)
     ostringstream filename_stream;
     filename_stream << filename;
     EOS_Mu_Table_ptr = new Table2D(filename_stream.str().c_str());
-
     return;
 }
 
-void Chemical_potential::Set_chemical_potential_s95pv0PCE()
+void Chemical_potential::Set_chemical_potential()
 {
     int Tb_sizeX = EOS_Mu_Table_ptr->getTbsizeX();
     Tb_length = Tb_sizeX;
@@ -46,10 +51,12 @@ void Chemical_potential::Set_chemical_potential_s95pv0PCE()
     for(int i=0; i<Tb_sizeX ; i++)
     {
        T[i] = EOS_Mu_Table_ptr->getTbdata(i, 0);
-       mu_pion[i] = EOS_Mu_Table_ptr->getTbdata(i, 1);
-       mu_K[i] = EOS_Mu_Table_ptr->getTbdata(i, 4);
+       if(EOS_PCE_kind < 3)
+       {
+          mu_pion[i] = EOS_Mu_Table_ptr->getTbdata(i, 1);
+          mu_K[i] = EOS_Mu_Table_ptr->getTbdata(i, 4);
+       }
     }
-
     return;
 }
 

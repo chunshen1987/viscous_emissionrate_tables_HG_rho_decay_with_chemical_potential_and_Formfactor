@@ -51,7 +51,8 @@ class HG_1to3_decay
       ~HG_1to3_decay();
       
       void output_emissionrateTable();
-      int Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel, string filename_in);
+      string get_filename(int channel_id);
+      int Calculate_emissionrates(Chemical_potential* chempotential_ptr, int channel);
       void set_particleMass();
       void set_gausspoints();
       double Integrate_E1(double Eq, double T, double s, double t, double* results);
