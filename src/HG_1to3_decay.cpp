@@ -616,9 +616,9 @@ double HG_1to3_decay::bulkvis_integrand_relaxation(double T, double E1, double E
    double E1_over_T = E1/T;
    double E2_over_T = E2/T;
    double E3_over_T = E3/T;
-   double integrand =   (1. + f0_E1)*bulkvis_Cbulk/(E1_over_T)*(-m[0]*m[0]/(3.*T*T) + bulkvis_e2*E1_over_T*E1_over_T)
-                      + f0_E2*bulkvis_Cbulk/(E2_over_T)*(-m[1]*m[1]/(3.*T*T) + bulkvis_e2*E2_over_T*E2_over_T)
-                      + f0_E3*bulkvis_Cbulk/(E3_over_T)*(-m[2]*m[2]/(3.*T*T) + bulkvis_e2*E3_over_T*E3_over_T);
+   double integrand = - (1. + f0_E1)*bulkvis_Cbulk/(E1_over_T)*(-m[0]*m[0]/(3.*T*T) + bulkvis_e2*E1_over_T*E1_over_T)
+                      - f0_E2*bulkvis_Cbulk/(E2_over_T)*(-m[1]*m[1]/(3.*T*T) + bulkvis_e2*E2_over_T*E2_over_T)
+                      - f0_E3*bulkvis_Cbulk/(E3_over_T)*(-m[2]*m[2]/(3.*T*T) + bulkvis_e2*E3_over_T*E3_over_T);
    return(integrand);
 }
 
