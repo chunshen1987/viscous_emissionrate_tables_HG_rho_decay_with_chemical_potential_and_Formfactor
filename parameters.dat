@@ -21,8 +21,7 @@ EOS_PCE_kind = 0       # kind of partial chemical equilibrium included
                        # 2: chemical freeze-out at T = 150 MeV
 
 # parameters for numerical integrations
-n_s = 100
-s_max = 50.0
+n_s = 20
 n_t = 20
 
 n_E1 = 20
