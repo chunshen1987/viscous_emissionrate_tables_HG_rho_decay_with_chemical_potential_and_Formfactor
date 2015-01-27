@@ -88,6 +88,8 @@ HG_1to3_decay::HG_1to3_decay(ParameterReader* paraRdr_in)
 
    if(bulk_deltaf_kind == 0)
        bulkdf_coeff = new Table ("chemical_potential_tb/s95p/s95p-PCE165-v0/BulkDf_Coefficients_Hadrons_CE.dat");
+   else if(bulk_deltaf_kind == 1)
+       bulkdf_coeff = new Table ("tables/Bulk_deltaf_Coefficients_RTA.dat");
 }
 
 HG_1to3_decay::~HG_1to3_decay()
@@ -587,24 +589,29 @@ void HG_1to3_decay::get_bulkvis_coefficients_14moment(double T, double* bulkvis_
 void HG_1to3_decay::get_bulkvis_coefficients_relaxation(double T, double* bulkvis_Cbulk, double* bulkvis_e2)
 // coefficients for bulk viscous corrections (fits from Gabriel Denicol, derived from relaxation time approximation)
 {
-   double T_fm = T/hbarC;  // convert to [1/fm]
-   double T_power[11];
-   T_power[0] = 1.0;
-   for(int i = 1; i < 11; i++)
-       T_power[i] = T_power[i-1]*T_fm;
+   double T_MeV = T*1000;
+   *bulkvis_Cbulk = bulkdf_coeff->interp(1, 2, T_MeV, 5);
+   *bulkvis_e2 = bulkdf_coeff->interp(1, 3, T_MeV, 5);
 
-   *bulkvis_Cbulk = (  642096.624265727 - 8163329.49562861*T_power[1] 
-                     + 47162768.4292073*T_power[2] - 162590040.002683*T_power[3] 
-                     + 369637951.096896*T_power[4] - 578181331.809836*T_power[5] 
-                     + 629434830.225675*T_power[6] - 470493661.096657*T_power[7] 
-                     + 230936465.421*T_power[8] - 67175218.4629078*T_power[9]
-                     + 8789472.32652964*T_power[10]);
-   *bulkvis_e2 = (  1.18171174036192 - 17.6740645873717*T_power[1]
-                  + 136.298469057177*T_power[2] - 635.999435106846*T_power[3]
-                  + 1918.77100633321*T_power[4] - 3836.32258307711*T_power[5]
-                  + 5136.35746882372*T_power[6] - 4566.22991441914*T_power[7]
-                  + 2593.45375240886*T_power[8] - 853.908199724349*T_power[9]
-                  + 124.260460450113*T_power[10]);
+   // parameterization between 100 MeV to 180 MeV
+   //double T_fm = T/hbarC;  // convert to [1/fm]
+   //double T_power[11];
+   //T_power[0] = 1.0;
+   //for(int i = 1; i < 11; i++)
+   //    T_power[i] = T_power[i-1]*T_fm;
+
+   //*bulkvis_Cbulk = (  642096.624265727 - 8163329.49562861*T_power[1] 
+   //                  + 47162768.4292073*T_power[2] - 162590040.002683*T_power[3] 
+   //                  + 369637951.096896*T_power[4] - 578181331.809836*T_power[5] 
+   //                  + 629434830.225675*T_power[6] - 470493661.096657*T_power[7] 
+   //                  + 230936465.421*T_power[8] - 67175218.4629078*T_power[9]
+   //                  + 8789472.32652964*T_power[10]);
+   //*bulkvis_e2 = (  1.18171174036192 - 17.6740645873717*T_power[1]
+   //               + 136.298469057177*T_power[2] - 635.999435106846*T_power[3]
+   //               + 1918.77100633321*T_power[4] - 3836.32258307711*T_power[5]
+   //               + 5136.35746882372*T_power[6] - 4566.22991441914*T_power[7]
+   //               + 2593.45375240886*T_power[8] - 853.908199724349*T_power[9]
+   //               + 124.260460450113*T_power[10]);
    return;
 }
 

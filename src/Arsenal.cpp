@@ -185,7 +185,7 @@ double interpCubicDirect(std::vector< double >* x, std::vector< double >* y, dou
     double dx = (*x)[1]-(*x)[0]; // increment in x
 
     // if close to left end:
-    if (abs(xx-(*x)[0])<dx*1e-30) return (*y)[0];
+    if (abs(xx-(*x)[0]) < dx*1e-8) return (*y)[0];
 
     // find x's integer index
     long idx = floor((xx-(*x)[0])/dx);
@@ -196,7 +196,8 @@ double interpCubicDirect(std::vector< double >* x, std::vector< double >* y, dou
         {
             cout    << "interpCubicDirect: x0 out of bounds." << endl
                     << "x ranges from " << (*x)[0] << " to " << (*x)[size-1] << ", "
-                    << "xx=" << xx << ", " << "dx=" << dx << ", " << "idx=" << idx << endl;
+                    << "xx=" << xx << ", " << "dx=" << dx << ", " << "idx=" << idx << ", "
+                    << "xx - x[0] = " << xx - (*x)[0] << endl;
             exit(1);
         }
         if (idx==0)
