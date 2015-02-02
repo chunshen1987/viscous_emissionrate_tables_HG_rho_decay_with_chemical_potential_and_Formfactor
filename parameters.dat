@@ -1,8 +1,9 @@
 # parameters for non-thermal equilibrium delta f correction
 deltaf_alpha = 2   #the exponent of the p dependence of the delta f correction deltaf_alpha = 2 for democratic choice
-bulk_deltaf_kind = 1   # bulk viscous delta f form
+bulk_deltaf_kind = 2   # bulk viscous delta f form
                        # 0: from 14 moments expansion
                        # 1: from relaxation time approximation
+                       # 2: from relaxation time approximation (with EOS)
 
 channel = 8            # specify the channel id to calculate
                        # 0: all the 7 channels

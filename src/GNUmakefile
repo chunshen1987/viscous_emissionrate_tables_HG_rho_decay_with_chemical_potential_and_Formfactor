@@ -26,12 +26,13 @@ endif
 
 SRC		=	main.cpp Arsenal.cpp gauss_quadrature.cpp \
                   Table2D.cpp chemical_potential.cpp Formfactor.cpp \
-                  HG_1to3_decay.cpp ParameterReader.cpp Table.cpp
+                  HG_1to3_decay.cpp ParameterReader.cpp Table.cpp \
+                  EOS.cpp
 
 INC		= 	Arsenal.h Physicalconstants.h Stopwatch.h \
                   gauss_quadrature.h Table2D.h chemical_potential.h \
                   Formfactor.h HG_1to3_decay.h ParameterReader.h \
-                  Table.h
+                  Table.h EOS.h
 
 # -------------------------------------------------
 
