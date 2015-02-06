@@ -92,6 +92,8 @@ HG_1to3_decay::HG_1to3_decay(ParameterReader* paraRdr_in, EOS* EOS_in)
        bulkdf_coeff = new Table ("chemical_potential_tb/s95p/s95p-PCE165-v0/BulkDf_Coefficients_Hadrons_CE.dat");
    else if(bulk_deltaf_kind == 1)
        bulkdf_coeff = new Table ("tables/Bulk_deltaf_Coefficients_RTA.dat");
+   bulkvis_Cbulk = 0.0;
+   bulkvis_e2 = 0.0;
 }
 
 HG_1to3_decay::~HG_1to3_decay()
@@ -213,6 +215,10 @@ int HG_1to3_decay::Calculate_emissionrates(Chemical_potential* chempotential_ptr
       mu[0] = mu1_tb[j];
       mu[1] = mu2_tb[j];
       mu[2] = mu3_tb[j];
+      if(bulk_deltaf_kind == 1)
+          get_bulkvis_coefficients_relaxation(T);
+      else if (bulk_deltaf_kind == 2)
+          get_bulkvis_coefficients_relaxation_2(T);
       for(int i=0; i<n_Eq; i++)
       {
           Eq = Eq_tb[i];
@@ -468,14 +474,10 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             }
             else if (bulk_deltaf_kind == 1)
             {
-                double bulkvis_Cbulk, bulkvis_e2;
-                get_bulkvis_coefficients_relaxation(T, &bulkvis_Cbulk, &bulkvis_e2);
                 bulkvis_result += common_factor*bulkvis_integrand_relaxation(T, E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2)*E2_weight[i];
             }
             else if (bulk_deltaf_kind == 2)
             {
-                double bulkvis_Cbulk, bulkvis_e2;
-                get_bulkvis_coefficients_relaxation_2(T, &bulkvis_Cbulk, &bulkvis_e2);
                 bulkvis_result += common_factor*bulkvis_integrand_relaxation(T, E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2)*E2_weight[i];
             }
          }
@@ -501,14 +503,10 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             }
             else if(bulk_deltaf_kind == 1)
             {
-                double bulkvis_Cbulk, bulkvis_e2;
-                get_bulkvis_coefficients_relaxation(T, &bulkvis_Cbulk, &bulkvis_e2);
                 bulkvis_result += common_factor*bulkvis_integrand_relaxation(T, E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2)*E2_weight[i];
             }
             else if(bulk_deltaf_kind == 2)
             {
-                double bulkvis_Cbulk, bulkvis_e2;
-                get_bulkvis_coefficients_relaxation_2(T, &bulkvis_Cbulk, &bulkvis_e2);
                 bulkvis_result += common_factor*bulkvis_integrand_relaxation(T, E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2)*E2_weight[i];
             }
          }
@@ -536,14 +534,10 @@ double HG_1to3_decay::Integrate_E2(double Eq, double T, double s, double t, doub
             }
             else if(bulk_deltaf_kind == 1)
             {
-                double bulkvis_Cbulk, bulkvis_e2;
-                get_bulkvis_coefficients_relaxation(T, &bulkvis_Cbulk, &bulkvis_e2);
                 bulkvis_result += common_factor*bulkvis_integrand_relaxation(T, E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2)*E2_weight[i];
             }
             else if(bulk_deltaf_kind == 2)
             {
-                double bulkvis_Cbulk, bulkvis_e2;
-                get_bulkvis_coefficients_relaxation_2(T, &bulkvis_Cbulk, &bulkvis_e2);
                 bulkvis_result += common_factor*bulkvis_integrand_relaxation(T, E1, E2_pt[i], Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2)*E2_weight[i];
             }
          }
@@ -606,12 +600,12 @@ void HG_1to3_decay::get_bulkvis_coefficients_14moment(double T, double* bulkvis_
    return;
 }
 
-void HG_1to3_decay::get_bulkvis_coefficients_relaxation(double T, double* bulkvis_Cbulk, double* bulkvis_e2)
+void HG_1to3_decay::get_bulkvis_coefficients_relaxation(double T)
 // coefficients for bulk viscous corrections (fits from Gabriel Denicol, derived from relaxation time approximation)
 {
    double T_MeV = T*1000;
-   *bulkvis_Cbulk = bulkdf_coeff->interp(1, 2, T_MeV, 5);
-   *bulkvis_e2 = bulkdf_coeff->interp(1, 3, T_MeV, 5);
+   bulkvis_Cbulk = bulkdf_coeff->interp(1, 2, T_MeV, 5);
+   bulkvis_e2 = bulkdf_coeff->interp(1, 3, T_MeV, 5);
 
    // parameterization between 100 MeV to 180 MeV
    //double T_fm = T/hbarC;  // convert to [1/fm]
@@ -635,15 +629,15 @@ void HG_1to3_decay::get_bulkvis_coefficients_relaxation(double T, double* bulkvi
    return;
 }
 
-void HG_1to3_decay::get_bulkvis_coefficients_relaxation_2(double T, double* bulkvis_Cbulk, double* bulkvis_e2)
+void HG_1to3_decay::get_bulkvis_coefficients_relaxation_2(double T)
 // coefficients from EOS
 {
    double cs2 = EOS_ptr->get_cs2_from_temperature(T);
-   double ed = EOS_ptr->get_energy_density_from_temperature(T);
-   double pressure = EOS_ptr->get_pressure_from_temperature(T);
+   double ed = EOS_ptr->get_energy_density_from_temperature(T)/hbarC;   // 1/fm^4
+   double pressure = EOS_ptr->get_pressure_from_temperature(T)/hbarC;
 
-   *bulkvis_Cbulk = 1./(15.*(ed + pressure)*(1./3. - cs2)*(1./3. - cs2));
-   *bulkvis_e2 = 1./3. - cs2;
+   bulkvis_Cbulk = 1./(15.*(ed + pressure)*(1./3. - cs2)*(1./3. - cs2));
+   bulkvis_e2 = 1./3. - cs2;
 
    return;
 }
@@ -658,15 +652,15 @@ double HG_1to3_decay::bulkvis_integrand_14moment(double E1, double E2, double Eq
    return(integrand);
 }
 
-double HG_1to3_decay::bulkvis_integrand_relaxation(double T, double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double bulkvis_Cbulk, double bulkvis_e2)
+double HG_1to3_decay::bulkvis_integrand_relaxation(double T, double E1, double E2, double Eq, double f0_E1, double f0_E2, double f0_E3, double bulkvis_Cbulk_in, double bulkvis_e2_in)
 {
    double E3 = E1 - E2 - Eq;
    double E1_over_T = E1/T;
    double E2_over_T = E2/T;
    double E3_over_T = E3/T;
-   double integrand = (1. + f0_E1)*bulkvis_Cbulk/(E1_over_T)*(-m[0]*m[0]/(3.*T*T) + bulkvis_e2*E1_over_T*E1_over_T)
-                      + f0_E2*bulkvis_Cbulk/(E2_over_T)*(-m[1]*m[1]/(3.*T*T) + bulkvis_e2*E2_over_T*E2_over_T)
-                      + f0_E3*bulkvis_Cbulk/(E3_over_T)*(-m[2]*m[2]/(3.*T*T) + bulkvis_e2*E3_over_T*E3_over_T);
+   double integrand = (1. + f0_E1)*bulkvis_Cbulk_in/(E1_over_T)*(-m[0]*m[0]/(3.*T*T) + bulkvis_e2_in*E1_over_T*E1_over_T)
+                      + f0_E2*bulkvis_Cbulk_in/(E2_over_T)*(-m[1]*m[1]/(3.*T*T) + bulkvis_e2_in*E2_over_T*E2_over_T)
+                      + f0_E3*bulkvis_Cbulk_in/(E3_over_T)*(-m[2]*m[2]/(3.*T*T) + bulkvis_e2_in*E3_over_T*E3_over_T);
    return(integrand);
 }
 
@@ -902,14 +896,10 @@ double HG_1to3_decay::RateintegrandE2(double E2, void *params)
        }
        else if(bulk_deltaf_kind == 1)
        {
-           double bulkvis_Cbulk, bulkvis_e2;
-           get_bulkvis_coefficients_relaxation(Temp, &bulkvis_Cbulk, &bulkvis_e2);
            result = common_factor*bulkvis_integrand_relaxation(Temp, E1, E2, Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2);
        }
        else if(bulk_deltaf_kind == 2)
        {
-           double bulkvis_Cbulk, bulkvis_e2;
-           get_bulkvis_coefficients_relaxation_2(Temp, &bulkvis_Cbulk, &bulkvis_e2);
            result = common_factor*bulkvis_integrand_relaxation(Temp, E1, E2, Eq, f0_E1, f0_E2, f0_E3, bulkvis_Cbulk, bulkvis_e2);
        }
     }
